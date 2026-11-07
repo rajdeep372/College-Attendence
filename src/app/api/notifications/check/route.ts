@@ -3,7 +3,6 @@ import nodemailer from "nodemailer";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { IUser } from "@/models/User";
 import Attendance, { IAttendance } from "@/models/Attendance";
-import Routine from "@/models/Routine";
 
 export interface AtRiskStudentData {
   id: string;
@@ -22,22 +21,30 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
 
+    const { searchParams } = new URL(req.url);
+    const departmentQuery = searchParams.get("department");
+
+    const studentFilter: Record<string, unknown> = { role: "Student" };
+    if (departmentQuery && departmentQuery.toLowerCase() !== "all") {
+      studentFilter.department = departmentQuery;
+    }
+
     // 1. Fetch real students from MongoDB
-    const students = await User.find({ role: "Student" }).lean<IUser[]>();
+    const students = await User.find(studentFilter).lean<IUser[]>();
 
-    // 2. Fetch real attendance records sorted by date descending
-    const attendanceRecords = await Attendance.find().sort({ date: -1 }).lean<IAttendance[]>();
-
-    if (!students || students.length === 0 || !attendanceRecords || attendanceRecords.length === 0) {
+    if (!students || students.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No attendance defaulters detected in institutional ledger.",
-        evaluatedStudentsCount: students ? students.length : 0,
+        message: "No registered students found in selected department.",
+        evaluatedStudentsCount: 0,
         atRiskStudentsCount: 0,
         emailsDispatched: 0,
         students: [],
       });
     }
+
+    // 2. Fetch real attendance records sorted by date descending
+    const attendanceRecords = await Attendance.find().sort({ date: -1 }).lean<IAttendance[]>();
 
     // 3. Calculate metrics for each student
     const atRiskStudents: AtRiskStudentData[] = [];
@@ -74,10 +81,15 @@ export async function POST(req: NextRequest) {
       const effectiveConsecutive = consecutiveAbsences;
 
       const riskReasons: string[] = [];
-      if (total > 0 && percentage < 75) {
-        riskReasons.push(`Attendance below 75% limit (${percentage}%)`);
+      // Any student strictly below 75% (including those at 0%) is flagged as at-risk
+      if (percentage < 75) {
+        if (total === 0) {
+          riskReasons.push("Zero attendance recorded (0.0% turnout - Attendance required)");
+        } else {
+          riskReasons.push(`Attendance below 75% limit (${percentage}%)`);
+        }
       }
-      if (total > 0 && effectiveConsecutive >= 3) {
+      if (effectiveConsecutive >= 3) {
         riskReasons.push(`${effectiveConsecutive} consecutive days absent without notice`);
       }
 
@@ -154,8 +166,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Identified ${atRiskStudents.length} at-risk students. Dispatched ${emailsDispatched} warning notifications.`,
+      message: `Identified ${atRiskStudents.length} at-risk students below 75% threshold. Dispatched ${emailsDispatched} warning notifications.`,
+      evaluatedStudentsCount: students.length,
       atRiskCount: atRiskStudents.length,
+      atRiskStudentsCount: atRiskStudents.length,
       emailsDispatched,
       isSmtpConfigured: Boolean(isSmtpConfigured),
       students: atRiskStudents,
@@ -168,10 +182,19 @@ export async function POST(req: NextRequest) {
 }
 
 // GET endpoint to query at-risk students without dispatching emails
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
-    const students = await User.find({ role: "Student" }).lean<IUser[]>();
+
+    const { searchParams } = new URL(req.url);
+    const departmentQuery = searchParams.get("department");
+
+    const studentFilter: Record<string, unknown> = { role: "Student" };
+    if (departmentQuery && departmentQuery.toLowerCase() !== "all") {
+      studentFilter.department = departmentQuery;
+    }
+
+    const students = await User.find(studentFilter).lean<IUser[]>();
     const attendanceRecords = await Attendance.find().sort({ date: -1 }).lean<IAttendance[]>();
 
     const atRiskStudents: AtRiskStudentData[] = [];
@@ -207,11 +230,16 @@ export async function GET() {
       const effectiveConsecutive = consecutiveAbsences;
 
       const riskReasons: string[] = [];
-      if (total > 0 && percentage < 75) {
-        riskReasons.push(`Below 75% limit (${percentage}%)`);
+      // Any student strictly below 75% (including those at 0%) is flagged as at-risk
+      if (percentage < 75) {
+        if (total === 0) {
+          riskReasons.push("Zero attendance recorded (0.0% turnout - Attendance required)");
+        } else {
+          riskReasons.push(`Attendance below 75% limit (${percentage}%)`);
+        }
       }
-      if (total > 0 && effectiveConsecutive >= 3) {
-        riskReasons.push(`${effectiveConsecutive} consecutive days absent`);
+      if (effectiveConsecutive >= 3) {
+        riskReasons.push(`${effectiveConsecutive} consecutive days absent without notice`);
       }
 
       if (riskReasons.length > 0) {
@@ -231,7 +259,9 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
+      evaluatedStudentsCount: students.length,
       count: atRiskStudents.length,
+      atRiskCount: atRiskStudents.length,
       students: atRiskStudents,
     });
   } catch (error: unknown) {
@@ -240,71 +270,57 @@ export async function GET() {
   }
 }
 
-// Generates an ultra-professional glass-styled institutional email template
 function generateWarningEmailHtml(student: AtRiskStudentData): string {
+  const isZero = student.attendancePercentage === 0;
   return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #030712; color: #f8fafc; margin: 0; padding: 24px; }
-    .container { max-width: 600px; margin: 0 auto; background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 18px; padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
-    .header { border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 20px; margin-bottom: 24px; }
-    .title { font-size: 22px; font-weight: 800; color: #ffffff; margin: 0; }
-    .badge { display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 11px; font-weight: 700; background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); margin-top: 8px; }
-    .metric-box { background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 16px; margin: 20px 0; display: flex; justify-content: space-between; }
-    .metric { text-align: center; }
-    .metric-val { font-size: 24px; font-weight: 800; color: #38bdf8; }
-    .metric-lbl { font-size: 11px; color: #94a3b8; text-transform: uppercase; margin-top: 4px; }
-    .warning-notice { background: rgba(127, 29, 29, 0.3); border-left: 4px solid #ef4444; padding: 14px; border-radius: 8px; font-size: 13px; color: #fca5a5; line-height: 1.5; }
-    .footer { font-size: 11px; color: #64748b; margin-top: 28px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; text-align: center; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1 class="title">AcademiaSync Institutional Notice</h1>
-      <span class="badge">ATTENDANCE DEFICIENCY WARNING</span>
-    </div>
-
-    <p style="font-size: 14px; line-height: 1.6; color: #e2e8f0;">
-      Dear <strong>${student.name}</strong>,
-    </p>
-
-    <p style="font-size: 13px; line-height: 1.6; color: #cbd5e1;">
-      This is an official automated advisory issued on behalf of the Office of the Principal and Department of ${student.department}. Your recorded lecture turnout has fallen below the mandatory threshold.
-    </p>
-
-    <div class="metric-box">
-      <div class="metric">
-        <div class="metric-val" style="color: #f87171;">${student.attendancePercentage}%</div>
-        <div class="metric-lbl">Current Aggregate</div>
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #0f172a; color: #f8fafc; border-radius: 16px; border: 1px solid rgba(239, 68, 68, 0.3);">
+      <div style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); padding-bottom: 16px; margin-bottom: 20px;">
+        <span style="font-size: 11px; font-weight: bold; color: #f43f5e; text-transform: uppercase; letter-spacing: 1.5px;">Official Academic Notice</span>
+        <h1 style="font-size: 22px; color: #ffffff; margin: 6px 0 0 0;">Attendance Disciplinary Warning</h1>
       </div>
-      <div class="metric">
-        <div class="metric-val">${student.consecutiveAbsences} Days</div>
-        <div class="metric-lbl">Consecutive Absences</div>
+
+      <p style="font-size: 15px; color: #cbd5e1; line-height: 1.6;">
+        Dear <strong>${student.name}</strong>,
+      </p>
+
+      <p style="font-size: 14px; color: #94a3b8; line-height: 1.6;">
+        This automated directive is issued by the Academic Dean & Head of Department. Your lecture attendance turnout in the <strong>${student.department}</strong> has fallen critically below the mandatory <strong>75% institutional threshold</strong>.
+      </p>
+
+      <div style="background: rgba(30, 41, 59, 0.7); border-radius: 12px; padding: 18px; margin: 20px 0; border: 1px solid rgba(255, 255, 255, 0.08);">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">Current Attendance Turnout:</td>
+            <td style="color: #f43f5e; font-weight: bold; text-align: right; font-size: 16px;">${student.attendancePercentage}%</td>
+          </tr>
+          <tr>
+            <td style="color: #94a3b8; padding: 6px 0;">Classes Conducted / Attended:</td>
+            <td style="color: #ffffff; font-weight: bold; text-align: right;">${student.attendedClasses} / ${student.totalClasses}</td>
+          </tr>
+          ${
+            student.consecutiveAbsences > 0
+              ? `<tr>
+                  <td style="color: #94a3b8; padding: 6px 0;">Consecutive Absences:</td>
+                  <td style="color: #fb923c; font-weight: bold; text-align: right;">${student.consecutiveAbsences} Days</td>
+                </tr>`
+              : ""
+          }
+        </table>
       </div>
-      <div class="metric">
-        <div class="metric-val" style="color: #34d399;">75.0%</div>
-        <div class="metric-lbl">Mandatory Minimum</div>
+
+      <div style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; padding: 12px; border-radius: 6px; margin: 20px 0;">
+        <p style="font-size: 12px; color: #fca5a5; margin: 0; line-height: 1.5;">
+          <strong>Critical Academic Consequence:</strong> Students with less than 75% total turnout are debarred from sitting for Semester End Examinations under University Regulation Code 4.2.
+        </p>
+      </div>
+
+      <p style="font-size: 13px; color: #94a3b8; line-height: 1.6;">
+        If you have legitimate medical reasons or official campus duty deputation, submit a verified Leave Application on your AcademiaSync Student Dashboard immediately.
+      </p>
+
+      <div style="font-size: 11px; color: #64748b; margin-top: 30px; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.08); padding-top: 16px;">
+        AcademiaSync Institutional Attendance System &bull; Office of Academic Affairs
       </div>
     </div>
-
-    <div class="warning-notice">
-      <strong>University Regulation Clause:</strong> Students failing to maintain at least <strong>75% attendance</strong> are automatically barred from appearing in end-semester examinations and will be marked as non-eligible.
-    </div>
-
-    <p style="font-size: 13px; color: #94a3b8; margin-top: 20px;">
-      Please report to your Head of Department (HOD) immediately or submit an approved Medical/On-Duty leave application through your AcademiaSync Student Portal.
-    </p>
-
-    <div class="footer">
-      Generated automatically by AcademiaSync Smart Attendance System &bull; Confidential Academic Record
-    </div>
-  </div>
-</body>
-</html>
   `;
 }
-

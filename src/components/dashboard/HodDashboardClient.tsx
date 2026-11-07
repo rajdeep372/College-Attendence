@@ -229,7 +229,7 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
         <RoutineUploadDropzone defaultDepartment={user?.department || "Computer Science"} />
 
         {/* At-Risk Students & Automated Disciplinary Warnings */}
-        <AtRiskStudentsCard />
+        <AtRiskStudentsCard department={user?.department} />
 
         {/* Pending Approvals & Syllabus Progress */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

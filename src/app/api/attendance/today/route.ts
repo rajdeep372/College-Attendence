@@ -7,18 +7,6 @@ import { Types } from "mongoose";
 
 type DayOfWeek = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday";
 
-interface PlainRoutine {
-  _id: Types.ObjectId | string;
-  department: string;
-  academicYear?: string;
-  semester: number;
-  section?: string;
-  dayOfWeek: DayOfWeek;
-  subject: string;
-  timeSlot: string;
-  teacherId?: Types.ObjectId | { _id: Types.ObjectId; name?: string; email?: string } | null;
-}
-
 export async function GET(req: NextRequest) {
   try {
     await connectToDatabase();
@@ -55,16 +43,6 @@ export async function GET(req: NextRequest) {
 
     if (!teacher) {
       teacher = await User.findOne({ role: { $in: ["Teacher", "HOD", "Principal"] } });
-      if (!teacher) {
-        teacher = await User.create({
-          clerkId: `teacher_seed_${Date.now()}`,
-          name: "Dr. Arvind Sharma",
-          email: "arvind.sharma@college.edu",
-          role: "Teacher",
-          department: "Computer Science & Engineering",
-          profilePicture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-        });
-      }
     }
 
     // Determine target parameters (Department, Academic Year, Semester, Section)
@@ -87,28 +65,55 @@ export async function GET(req: NextRequest) {
       dayOfWeek: activeDay,
     };
 
-    let routine = await Routine.findOne({
-      ...routineFilter,
-      teacherId: teacher._id,
-    })
-      .populate("teacherId", "name email department")
-      .lean<PlainRoutine | null>();
-
-    if (!routine) {
-      routine = await Routine.findOne(routineFilter)
+    let routineDoc = null;
+    if (teacher) {
+      routineDoc = await Routine.findOne({
+        ...routineFilter,
+        $or: [{ teacherId: teacher._id }, { "classes.teacherId": teacher._id }],
+      })
         .populate("teacherId", "name email department")
-        .lean<PlainRoutine | null>();
+        .populate("classes.teacherId", "name email department")
+        .lean();
+    }
+
+    if (!routineDoc) {
+      routineDoc = await Routine.findOne(routineFilter)
+        .populate("teacherId", "name email department")
+        .populate("classes.teacherId", "name email department")
+        .lean();
     }
 
     // If still no routine today, search for any routine for this exact class
-    if (!routine) {
-      routine = await Routine.findOne({
+    if (!routineDoc) {
+      routineDoc = await Routine.findOne({
         department: targetDepartment,
         semester: targetSemester,
         section: targetSection,
       })
         .populate("teacherId", "name email department")
-        .lean<PlainRoutine | null>();
+        .populate("classes.teacherId", "name email department")
+        .lean();
+    }
+
+    // Resolve subject, timeSlot, and paperCode from day-grouped classes or legacy fields
+    let resolvedSubject = "Core Curriculum Lecture";
+    let resolvedTimeSlot = "10:00 AM - 11:00 AM";
+    let resolvedPaperCode = "";
+
+    if (routineDoc) {
+      if ((routineDoc as any).classes && Array.isArray((routineDoc as any).classes) && (routineDoc as any).classes.length > 0) {
+        const classesList = (routineDoc as any).classes;
+        const matchingClass =
+          classesList.find((c: any) => teacher && c.teacherId?.toString() === teacher._id.toString()) ||
+          classesList[0];
+        resolvedSubject = matchingClass.subject || resolvedSubject;
+        resolvedTimeSlot = matchingClass.timeSlot || resolvedTimeSlot;
+        resolvedPaperCode = matchingClass.paperCode || "";
+      } else if ((routineDoc as any).subject) {
+        resolvedSubject = (routineDoc as any).subject;
+        resolvedTimeSlot = (routineDoc as any).timeSlot || resolvedTimeSlot;
+        resolvedPaperCode = (routineDoc as any).paperCode || "";
+      }
     }
 
     // 4. Fetch Students strictly filtered by the 4 parameters (Role: Student, Department, Semester, Section)
@@ -123,8 +128,6 @@ export async function GET(req: NextRequest) {
       .sort({ rollNumber: 1, name: 1 })
       .lean<IUser[]>();
 
-    // If no students in exact section/semester, do a relaxed search for this department + semester
-    // only if strictly no students match section yet, so teachers can see unsectioned or newly registered students
     if (!students || students.length === 0) {
       const relaxedFilter: Record<string, unknown> = {
         role: "Student",
@@ -153,25 +156,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       day: activeDay,
-      teacher: {
+      teacher: teacher ? {
         _id: teacher._id.toString(),
         name: teacher.name,
         email: teacher.email,
         department: teacher.department,
+      } : {
+        _id: "",
+        name: "Faculty Instructor",
+        email: "faculty@college.edu",
+        department: targetDepartment,
       },
       targetDepartment,
       targetAcademicYear,
       targetSemester,
       targetSection,
-      routine: routine ? {
-        _id: routine._id ? routine._id.toString() : "",
-        subject: routine.subject,
-        department: routine.department || targetDepartment,
-        academicYear: routine.academicYear || targetAcademicYear,
-        semester: routine.semester || targetSemester,
-        section: routine.section || targetSection,
-        timeSlot: routine.timeSlot,
-        dayOfWeek: routine.dayOfWeek || activeDay,
+      routine: routineDoc ? {
+        _id: routineDoc._id ? routineDoc._id.toString() : "",
+        subject: resolvedSubject,
+        paperCode: resolvedPaperCode,
+        department: (routineDoc as any).department || targetDepartment,
+        academicYear: (routineDoc as any).academicYear || targetAcademicYear,
+        semester: (routineDoc as any).semester || targetSemester,
+        section: (routineDoc as any).section || targetSection,
+        timeSlot: resolvedTimeSlot,
+        dayOfWeek: (routineDoc as any).dayOfWeek || activeDay,
       } : null,
       studentCount: formattedStudents.length,
       students: formattedStudents,

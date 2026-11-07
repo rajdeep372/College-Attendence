@@ -24,9 +24,16 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
     const customDepartment = (formData.get("department") as string) || "Bachelor of Computer Applications (BCA)";
     const customSemester = Number(formData.get("semester")) || 5;
-    const customAcademicYear = (formData.get("academicYear") as string) || (customSemester <= 2 ? "1st Year" : customSemester <= 4 ? "2nd Year" : customSemester <= 6 ? "3rd Year" : "4th Year");
+    const customAcademicYear =
+      (formData.get("academicYear") as string) ||
+      (customSemester <= 2
+        ? "1st Year"
+        : customSemester <= 4
+        ? "2nd Year"
+        : customSemester <= 6
+        ? "3rd Year"
+        : "4th Year");
     const customSection = (formData.get("section") as string) || "Section A";
-    const shouldSave = formData.get("save") !== "false"; // Default true
 
     if (!file) {
       return NextResponse.json(
@@ -43,9 +50,10 @@ export async function POST(req: NextRequest) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || apiKey.includes("your_gemini") || apiKey.length < 10) {
       return NextResponse.json(
-        { 
-          success: false, 
-          error: "GEMINI_API_KEY is not configured in .env.local. Please provide a valid Gemini API key to enable OCR vision timetable parsing." 
+        {
+          success: false,
+          error:
+            "GEMINI_API_KEY is not configured in .env.local. Please provide a valid Gemini API key to enable OCR vision timetable parsing.",
         },
         { status: 400 }
       );
@@ -142,16 +150,24 @@ Do not include markdown fences or explanatory text. Return ONLY the raw JSON arr
     }
 
     // Standardize days of week, time slots, and formats
-    const validDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    parsedSchedules = parsedSchedules
+    const validDays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+    type ValidDay = typeof validDays[number];
+
+    const cleanSchedules = parsedSchedules
       .filter((item) => {
         const subj = (item.subject || "").toLowerCase();
         // Discard any breaks or lunches
-        return !subj.includes("break") && !subj.includes("recess") && !subj.includes("lunch") && !subj.includes("tiffin");
+        return (
+          !subj.includes("break") &&
+          !subj.includes("recess") &&
+          !subj.includes("lunch") &&
+          !subj.includes("tiffin")
+        );
       })
       .map((item) => {
         const rawDay = item.dayOfWeek || "Monday";
-        const matchedDay = validDays.find((d) => d.toLowerCase() === rawDay.toLowerCase()) || "Monday";
+        const matchedDay =
+          validDays.find((d) => d.toLowerCase() === rawDay.toLowerCase()) || "Monday";
         const cleanPaperCode = (item.paperCode || "").trim();
         let cleanSubject = (item.subject || cleanPaperCode || "Scheduled Class").trim();
 
@@ -161,7 +177,7 @@ Do not include markdown fences or explanatory text. Return ONLY the raw JSON arr
         }
 
         return {
-          dayOfWeek: matchedDay as ParsedScheduleItem["dayOfWeek"],
+          dayOfWeek: matchedDay as ValidDay,
           department: item.department || customDepartment,
           academicYear: item.academicYear || customAcademicYear,
           semester: Number(item.semester) || customSemester,
@@ -169,71 +185,62 @@ Do not include markdown fences or explanatory text. Return ONLY the raw JSON arr
           timeSlot: (item.timeSlot || "10:00 AM - 11:00 AM").trim(),
           paperCode: cleanPaperCode,
           subject: cleanSubject,
-          teacher: (item.teacher || "Faculty Instructor").trim(),
+          teacherName: (item.teacher || "Faculty Instructor").trim(),
         };
       });
 
-    // If shouldSave is true, save directly into MongoDB Routine collection
-    let insertedRoutines: any[] = [];
-    if (shouldSave && parsedSchedules.length > 0) {
-      // 1. Clean existing routines strictly for this specific department, semester & section to prevent stale duplicates
-      await Routine.deleteMany({
-        department: customDepartment,
-        semester: customSemester,
-        section: customSection,
-      });
-
-      // 2. Prepare routine documents with valid Teacher User ObjectIds
-      const routineDocs = await Promise.all(
-        parsedSchedules.map(async (item) => {
-          const cleanTeacherName = item.teacher.replace(/^(Dr\.|Prof\.|Mr\.|Ms\.)\s*/i, "").trim();
-
-          // Attempt to find existing teacher by name or role
-          let teacherDoc = await User.findOne({
-            role: "Teacher",
-            name: new RegExp(cleanTeacherName || "Faculty", "i"),
-          });
-
-          // Auto-provision teacher if not present in MongoDB
-          if (!teacherDoc) {
-            const emailSlug = cleanTeacherName.toLowerCase().replace(/[^a-z0-9]/g, ".") || "faculty";
-            teacherDoc = await User.create({
-              clerkId: `teacher_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-              name: item.teacher,
-              email: `${emailSlug}@academiasync.edu`,
-              role: "Teacher",
-              department: customDepartment,
-              designation: "Faculty Instructor",
-              onboarded: true,
-            });
-          }
-
-          return {
-            department: item.department,
-            academicYear: customAcademicYear,
-            semester: item.semester,
-            section: customSection,
-            dayOfWeek: item.dayOfWeek,
-            paperCode: item.paperCode,
-            subject: item.subject,
-            timeSlot: item.timeSlot,
-            teacherId: teacherDoc._id,
-          };
-        })
-      );
-
-      // 3. Bulk insert into MongoDB
-      insertedRoutines = await Routine.insertMany(routineDocs);
-      console.log(`[Smart AI Routine Parser] Inserted ${insertedRoutines.length} resolved routine records into MongoDB for ${customDepartment} (${customSection}).`);
+    // Group strictly by dayOfWeek - ONE object per day
+    const dayMap = new Map<ValidDay, Array<{ timeSlot: string; paperCode?: string; subject: string; teacherName: string }>>();
+    for (const d of validDays) {
+      dayMap.set(d, []);
     }
+
+    for (const item of cleanSchedules) {
+      const list = dayMap.get(item.dayOfWeek);
+      if (list) {
+        list.push({
+          timeSlot: item.timeSlot,
+          paperCode: item.paperCode,
+          subject: item.subject,
+          teacherName: item.teacherName,
+        });
+      }
+    }
+
+    const groupedRoutines = validDays
+      .map((day) => ({
+        dayOfWeek: day,
+        classes: dayMap.get(day) || [],
+      }))
+      .filter((dayGroup) => dayGroup.classes.length > 0);
+
+    // Extract unique faculty names for HOD review & bridge mapping
+    const extractedFaculties = Array.from(
+      new Set(cleanSchedules.map((s) => s.teacherName).filter(Boolean))
+    );
+
+    // Fetch registered real teachers in MongoDB (Zero ghost accounts created)
+    const registeredTeachers = await User.find({
+      role: { $in: ["Teacher", "HOD", "Principal"] },
+      department: customDepartment,
+    })
+      .select("_id name email department designation")
+      .lean();
 
     return NextResponse.json({
       success: true,
-      message: `Successfully extracted and linked ${parsedSchedules.length} classes from uploaded timetable.`,
-      count: parsedSchedules.length,
-      savedToDatabase: shouldSave,
-      data: parsedSchedules,
-      insertedCount: insertedRoutines.length,
+      message: `Successfully extracted ${cleanSchedules.length} classes across ${groupedRoutines.length} days from uploaded timetable.`,
+      count: cleanSchedules.length,
+      daysCount: groupedRoutines.length,
+      groupedRoutines,
+      extractedFaculties,
+      registeredTeachers: registeredTeachers.map((t) => ({
+        _id: t._id.toString(),
+        name: t.name,
+        email: t.email,
+        designation: (t as any).designation || "Faculty",
+        department: t.department,
+      })),
       department: customDepartment,
       academicYear: customAcademicYear,
       semester: customSemester,
@@ -272,7 +279,8 @@ export async function GET(req: NextRequest) {
 
     const routines = await Routine.find(query)
       .populate("teacherId", "name email")
-      .sort({ dayOfWeek: 1, timeSlot: 1 })
+      .populate("classes.teacherId", "name email")
+      .sort({ dayOfWeek: 1 })
       .lean();
 
     return NextResponse.json({

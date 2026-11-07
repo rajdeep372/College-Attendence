@@ -18,6 +18,7 @@ export interface IUser extends Document {
   profilePicture?: string;
   idCardSoftCopy?: string;
   sessionYear?: string;
+  batchDuration?: string;
   archivedSessions?: Array<{
     semester: number;
     sessionYear: string;
@@ -116,6 +117,11 @@ const UserSchema = new Schema<IUser>(
     sessionYear: {
       type: String,
       default: "2024-2025",
+    },
+    batchDuration: {
+      type: String,
+      trim: true,
+      default: "2024-2028",
     },
     archivedSessions: [
       {

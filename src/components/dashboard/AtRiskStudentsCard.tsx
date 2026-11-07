@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { AtRiskStudentData } from "@/app/api/notifications/check/route";
 
-export function AtRiskStudentsCard() {
+export function AtRiskStudentsCard({ department }: { department?: string } = {}) {
   const [students, setStudents] = useState<AtRiskStudentData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -23,11 +23,14 @@ export function AtRiskStudentsCard() {
   // Initial fetch of at-risk students
   useEffect(() => {
     fetchAtRiskList();
-  }, []);
+  }, [department]);
 
   const fetchAtRiskList = async () => {
     try {
-      const res = await fetch("/api/notifications/check", { method: "GET" });
+      const url = department
+        ? `/api/notifications/check?department=${encodeURIComponent(department)}`
+        : "/api/notifications/check";
+      const res = await fetch(url, { method: "GET" });
       const data = await res.json();
       if (data.success && data.students) {
         setStudents(data.students);
@@ -44,7 +47,11 @@ export function AtRiskStudentsCard() {
     setFeedback(null);
 
     try {
-      const res = await fetch("/api/notifications/check", { method: "POST" });
+      const res = await fetch("/api/notifications/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ department }),
+      });
       const data = await res.json();
 
       if (!res.ok || !data.success) {

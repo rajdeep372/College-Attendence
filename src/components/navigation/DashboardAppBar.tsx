@@ -39,44 +39,6 @@ export interface NotificationItem {
   link?: string;
 }
 
-const DEFAULT_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: "notif-1",
-    title: "Upcoming Class Reminder",
-    message: "Data Structures & Algorithms lecture starts in 10 minutes (Room 402).",
-    time: "Just now",
-    type: "alert",
-    read: false,
-    link: "/dashboard/student",
-  },
-  {
-    id: "notif-2",
-    title: "Biometric Attendance Logged",
-    message: "You were successfully marked Present for Database Management Systems.",
-    time: "45m ago",
-    type: "success",
-    read: false,
-    link: "/dashboard/student#subjects",
-  },
-  {
-    id: "notif-3",
-    title: "Official Institutional Circular",
-    message: "Mandatory End-Semester Biometric Ledger Audit published by Dean's Office.",
-    time: "2h ago",
-    type: "circular",
-    read: false,
-    link: "/dashboard/student",
-  },
-  {
-    id: "notif-4",
-    title: "Department Audit Score",
-    message: "Computer Science & Engineering attendance compliance is at 96.4%.",
-    time: "Today",
-    type: "info",
-    read: true,
-  },
-];
-
 export function DashboardAppBar() {
   const pathname = usePathname();
   const { isSignedIn, user } = useUser();
@@ -85,7 +47,8 @@ export function DashboardAppBar() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuditsOpen, setIsAuditsOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(DEFAULT_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
 
   // Close menus on path navigation
   useEffect(() => {
@@ -94,35 +57,27 @@ export function DashboardAppBar() {
     setIsAuditsOpen(false);
   }, [pathname]);
 
-  // Try fetching dynamic campus circulars for notifications
+  // Fetch real user notifications strictly from MongoDB
   useEffect(() => {
-    async function fetchLiveCirculars() {
+    async function fetchRealNotifications() {
       try {
-        const res = await fetch("/api/circulars");
+        setIsLoadingNotifications(true);
+        const res = await fetch("/api/notifications");
         const data = await res.json();
-        if (data.success && Array.isArray(data.circulars) && data.circulars.length > 0) {
-          const fetchedNotifs: NotificationItem[] = data.circulars.slice(0, 3).map((c: any) => ({
-            id: c._id,
-            title: c.title,
-            message: c.content?.slice(0, 90) + (c.content?.length > 90 ? "..." : ""),
-            time: new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            type: c.important ? "alert" : "circular",
-            read: false,
-            link: "/dashboard/student",
-          }));
-
-          setNotifications((prev) => {
-            const existingIds = new Set(prev.map((n) => n.id));
-            const newNotifs = fetchedNotifs.filter((n) => !existingIds.has(n.id));
-            return [...newNotifs, ...prev];
-          });
+        if (data.success && Array.isArray(data.notifications)) {
+          setNotifications(data.notifications);
+        } else {
+          setNotifications([]);
         }
       } catch (err) {
-        // Fallback gracefully to default notifications
+        console.warn("Failed to fetch real notifications:", err);
+        setNotifications([]);
+      } finally {
+        setIsLoadingNotifications(false);
       }
     }
-    fetchLiveCirculars();
-  }, []);
+    fetchRealNotifications();
+  }, [pathname]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -298,8 +253,9 @@ export function DashboardAppBar() {
                       <div className="max-h-80 overflow-y-auto divide-y divide-white/5 scrollbar-thin">
                         {notifications.length === 0 ? (
                           <div className="p-8 text-center text-xs text-slate-400">
-                            <CheckCircle2 className="w-6 h-6 text-emerald-400 mx-auto mb-2 opacity-80" />
-                            All notifications cleared. You are completely up to date.
+                            <Bell className="w-6 h-6 text-slate-600 mx-auto mb-2 opacity-50" />
+                            <div className="font-semibold text-slate-300">No new notifications</div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">You are completely up to date.</p>
                           </div>
                         ) : (
                           notifications.map((notif) => {

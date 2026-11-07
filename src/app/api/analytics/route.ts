@@ -119,7 +119,18 @@ export async function GET(req: NextRequest) {
       }).lean();
 
       for (const r of scheduledRoutines) {
-        if (!subjectMap[r.subject]) {
+        if ((r as any).classes && Array.isArray((r as any).classes) && (r as any).classes.length > 0) {
+          for (const c of (r as any).classes) {
+            if (c.subject && !subjectMap[c.subject]) {
+              subjectMap[c.subject] = {
+                code: c.paperCode || (c.subject.includes(" ") ? c.subject.split(" ")[0] : "SUBJ"),
+                name: c.subject,
+                attended: 0,
+                total: 0,
+              };
+            }
+          }
+        } else if (r.subject && !subjectMap[r.subject]) {
           subjectMap[r.subject] = {
             code: (r as any).paperCode || (r.subject.includes(" ") ? r.subject.split(" ")[0] : "SUBJ"),
             name: r.subject,
@@ -217,13 +228,28 @@ export async function GET(req: NextRequest) {
             .limit(4)
             .lean();
 
-      const todayRoutines = fallbackRoutines.map((r: any) => ({
-        _id: r._id.toString(),
-        subject: r.subject,
-        timeSlot: r.timeSlot,
-        dayOfWeek: r.dayOfWeek,
-        teacherName: r.teacherId?.name || "Assigned Faculty",
-      }));
+      const todayRoutines: any[] = [];
+      for (const r of fallbackRoutines) {
+        if ((r as any).classes && Array.isArray((r as any).classes) && (r as any).classes.length > 0) {
+          for (const c of (r as any).classes) {
+            todayRoutines.push({
+              _id: r._id.toString(),
+              subject: c.subject,
+              timeSlot: c.timeSlot,
+              dayOfWeek: r.dayOfWeek,
+              teacherName: c.teacherName || (c.teacherId as any)?.name || "Assigned Faculty",
+            });
+          }
+        } else if ((r as any).subject) {
+          todayRoutines.push({
+            _id: r._id.toString(),
+            subject: (r as any).subject,
+            timeSlot: (r as any).timeSlot,
+            dayOfWeek: r.dayOfWeek,
+            teacherName: (r as any).teacherId?.name || "Assigned Faculty",
+          });
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -260,7 +286,7 @@ export async function GET(req: NextRequest) {
       // Query routines assigned to this teacher
       const routineQuery: Record<string, unknown> = { dayOfWeek: activeDay };
       if (teacherObjectId) {
-        routineQuery.teacherId = teacherObjectId;
+        routineQuery.$or = [{ teacherId: teacherObjectId }, { "classes.teacherId": teacherObjectId }];
       } else if (department) {
         routineQuery.department = department;
       }
@@ -270,7 +296,9 @@ export async function GET(req: NextRequest) {
       // Fallback: if no routines found for today, fetch all routines for this teacher or department
       if (todayRoutines.length === 0) {
         todayRoutines = await Routine.find(
-          teacherObjectId ? { teacherId: teacherObjectId } : { department: department || { $exists: true } }
+          teacherObjectId
+            ? { $or: [{ teacherId: teacherObjectId }, { "classes.teacherId": teacherObjectId }] }
+            : { department: department || { $exists: true } }
         )
           .limit(5)
           .lean();
@@ -329,19 +357,67 @@ export async function GET(req: NextRequest) {
       const defaulterList = Object.values(defaulterMap).slice(0, 5);
 
       // Format today classes with real live status
-      const formattedClasses = todayRoutines.map((r, idx) => ({
-        _id: r._id.toString(),
-        code: r.subject.split(" ")[0] || `CS-${500 + idx * 2}`,
-        title: r.subject,
-        time: r.timeSlot,
-        department: r.department,
-        academicYear: r.academicYear || (r.semester <= 2 ? "1st Year" : r.semester <= 4 ? "2nd Year" : r.semester <= 6 ? "3rd Year" : "4th Year"),
-        semester: r.semester,
-        section: r.section || "Section A",
-        hall: `Hall ${r.semester}0${idx + 1}`,
-        status: idx === 0 ? "Completed" : idx === 1 ? "Live Now" : "Upcoming",
-        attendance: idx === 0 ? "Turnout Logged" : idx === 1 ? "In Session" : "Pending",
-      }));
+      const formattedClasses: any[] = [];
+      let classCounter = 0;
+      for (const r of todayRoutines) {
+        if ((r as any).classes && Array.isArray((r as any).classes) && (r as any).classes.length > 0) {
+          const relevantClasses = teacherObjectId
+            ? (r as any).classes.filter(
+                (c: any) => c.teacherId?.toString() === teacherObjectId?.toString()
+              )
+            : (r as any).classes;
+
+          const toDisplay = relevantClasses.length > 0 ? relevantClasses : (r as any).classes;
+
+          for (const c of toDisplay) {
+            classCounter++;
+            formattedClasses.push({
+              _id: r._id.toString(),
+              code: c.paperCode || c.subject.split(" ")[0] || `CS-${500 + classCounter * 2}`,
+              title: c.subject,
+              time: c.timeSlot,
+              department: r.department,
+              academicYear:
+                r.academicYear ||
+                (r.semester <= 2
+                  ? "1st Year"
+                  : r.semester <= 4
+                  ? "2nd Year"
+                  : r.semester <= 6
+                  ? "3rd Year"
+                  : "4th Year"),
+              semester: r.semester,
+              section: r.section || "Section A",
+              hall: `Hall ${r.semester}0${classCounter}`,
+              status: classCounter === 1 ? "Live Now" : "Upcoming",
+              attendance: classCounter === 1 ? "In Session" : "Pending",
+            });
+          }
+        } else if ((r as any).subject) {
+          classCounter++;
+          formattedClasses.push({
+            _id: r._id.toString(),
+            code: (r as any).paperCode || (r as any).subject.split(" ")[0] || `CS-${500 + classCounter * 2}`,
+            title: (r as any).subject,
+            time: (r as any).timeSlot,
+            department: r.department,
+            academicYear:
+              r.academicYear ||
+              (r.semester <= 2
+                ? "1st Year"
+                : r.semester <= 4
+                ? "2nd Year"
+                : r.semester <= 6
+                ? "3rd Year"
+                : "4th Year"),
+            semester: r.semester,
+            section: r.section || "Section A",
+            hall: `Hall ${r.semester}0${classCounter}`,
+            status: classCounter === 1 ? "Live Now" : "Upcoming",
+            attendance: classCounter === 1 ? "In Session" : "Pending",
+          });
+        }
+      }
 
       return NextResponse.json({
         success: true,
@@ -394,6 +470,11 @@ export async function GET(req: NextRequest) {
       const branchAttendanceRate =
         deptTotal > 0 ? ((deptPresent / deptTotal) * 100).toFixed(1) + "%" : "0.0%";
 
+      const totalDeptSessions = departmentRoutines.reduce(
+        (acc, r: any) => acc + (r.classes?.length || 1),
+        0
+      );
+
       const stats = [
         {
           label: "Branch Attendance",
@@ -409,7 +490,7 @@ export async function GET(req: NextRequest) {
         },
         {
           label: "Classes Scheduled",
-          value: `${departmentRoutines.length} Sessions`,
+          value: `${totalDeptSessions} Sessions`,
           sub: "Active Timetable Modules",
           color: "from-emerald-500 to-teal-600",
         },
@@ -557,10 +638,19 @@ export async function GET(req: NextRequest) {
             email: t.email,
             designation: t.designation || "Faculty",
             profilePicture: t.profilePicture || "",
-            routinesCount: deptRoutines.filter((r) => r.teacherId?._id?.toString() === t._id.toString()).length,
+            routinesCount: deptRoutines.reduce(
+              (count, r: any) =>
+                count +
+                (r.classes
+                  ? r.classes.filter((c: any) => c.teacherId?.toString() === t._id.toString()).length
+                  : r.teacherId?._id?.toString() === t._id.toString()
+                  ? 1
+                  : 0),
+              0
+            ),
           })),
           studentCount: deptStudents.length,
-          routinesCount: deptRoutines.length,
+          routinesCount: deptRoutines.reduce((acc, r: any) => acc + (r.classes?.length || 1), 0),
           attendanceRate: pct,
         };
       });
@@ -610,7 +700,7 @@ export async function GET(req: NextRequest) {
           allPendingLeaves: pendingLeavesRaw,
           totalStudents: totalStudentsCount,
           totalFaculty: totalFacultyCount,
-          totalRoutines: allRoutines.length,
+          totalRoutines: allRoutines.reduce((acc, r: any) => acc + (r.classes?.length || 1), 0),
           activeDepartments: activeDeptNames,
         },
       });

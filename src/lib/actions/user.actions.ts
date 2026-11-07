@@ -28,6 +28,7 @@ export interface SerializedUser {
   profilePicture: string;
   idCardSoftCopy?: string;
   sessionYear?: string;
+  batchDuration?: string;
   archivedSessions?: Array<{
     semester: number;
     sessionYear: string;
@@ -148,6 +149,7 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       profilePicture: dbUser.profilePicture || clerkUser.imageUrl || "",
       idCardSoftCopy: dbUser.idCardSoftCopy || "",
       sessionYear: dbUser.sessionYear || "2024-2025",
+      batchDuration: dbUser.batchDuration || dbUser.sessionYear || "2024-2028",
       archivedSessions: dbUser.archivedSessions?.map((s) => ({
         semester: s.semester,
         sessionYear: s.sessionYear,

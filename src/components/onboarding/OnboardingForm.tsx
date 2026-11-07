@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
@@ -17,7 +17,8 @@ import {
   Layers,
   BookOpen,
   UserCheck,
-  Calendar
+  Calendar,
+  Clock
 } from "lucide-react";
 
 export const DEPARTMENTS = [
@@ -49,6 +50,14 @@ export const SECTIONS = [
   "Section D",
 ];
 
+export const BATCH_OPTIONS = [
+  "2024-2028",
+  "2023-2027",
+  "2022-2026",
+  "2021-2025",
+  "2025-2029",
+];
+
 const DESIGNATIONS = [
   "Assistant Professor",
   "Associate Professor",
@@ -64,6 +73,12 @@ interface OnboardingFormProps {
   initialRole?: "Student" | "Teacher" | "HOD" | "Principal";
   initialDepartment?: string;
   initialRoll?: string;
+}
+
+interface UnclaimedProfile {
+  teacherName: string;
+  classCount: number;
+  subjects: string[];
 }
 
 export function OnboardingForm({
@@ -84,7 +99,13 @@ export function OnboardingForm({
   const [academicYear, setAcademicYear] = useState<string>("3rd Year");
   const [semester, setSemester] = useState<number>(5);
   const [section, setSection] = useState<string>("Section A");
+  const [batchDuration, setBatchDuration] = useState<string>("2024-2028");
   const [designation, setDesignation] = useState("Assistant Professor");
+
+  // Faculty Routine Claiming state
+  const [unclaimedSlots, setUnclaimedSlots] = useState<UnclaimedProfile[]>([]);
+  const [claimedFacultyName, setClaimedFacultyName] = useState<string>("");
+  const [isLoadingUnclaimed, setIsLoadingUnclaimed] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -108,6 +129,27 @@ export function OnboardingForm({
     else if (newYear === "4th Year" && semester < 7) setSemester(7);
   };
 
+  // Fetch unclaimed routine slots for teachers
+  useEffect(() => {
+    if (role !== "Student" && department) {
+      setIsLoadingUnclaimed(true);
+      fetch(`/api/routine/unclaimed?department=${encodeURIComponent(department)}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success && data.unclaimedProfiles) {
+            setUnclaimedSlots(data.unclaimedProfiles);
+          } else {
+            setUnclaimedSlots([]);
+          }
+        })
+        .catch((err) => {
+          console.warn("Error fetching unclaimed routine slots:", err);
+          setUnclaimedSlots([]);
+        })
+        .finally(() => setIsLoadingUnclaimed(false));
+    }
+  }, [role, department]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
@@ -115,6 +157,11 @@ export function OnboardingForm({
 
     if (role === "Student" && !rollNumber.trim()) {
       setErrorMessage("Roll Number is required to map you to your exact classroom roster.");
+      return;
+    }
+
+    if (role === "Student" && !batchDuration.trim()) {
+      setErrorMessage("Batch / Course Duration is required for students.");
       return;
     }
 
@@ -133,11 +180,13 @@ export function OnboardingForm({
           name: name.trim(),
           role,
           department,
+          batchDuration: role === "Student" ? batchDuration.trim() : undefined,
           academicYear: role === "Student" ? academicYear : undefined,
           semester: role === "Student" ? Number(semester) : undefined,
           section: role === "Student" ? section : undefined,
           rollNumber: role === "Student" ? rollNumber.trim().toUpperCase() : undefined,
           designation: role !== "Student" ? designation : undefined,
+          claimedFacultyName: role !== "Student" && claimedFacultyName ? claimedFacultyName : undefined,
         }),
       });
 
@@ -259,7 +308,7 @@ export function OnboardingForm({
           </div>
         </div>
 
-        {/* 1. Academic Department (Expanded Options) */}
+        {/* 1. Academic Department */}
         <div>
           <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
             <span>Academic Department</span>
@@ -279,7 +328,7 @@ export function OnboardingForm({
         </div>
 
         {/* ============================================================== */}
-        {/* STUDENT CONDITIONAL 4-PARAMETER HIERARCHY                      */}
+        {/* STUDENT CONDITIONAL PARAMETERS                                 */}
         {/* ============================================================== */}
         {role === "Student" && (
           <motion.div
@@ -288,6 +337,33 @@ export function OnboardingForm({
             exit={{ opacity: 0, height: 0 }}
             className="space-y-4 pt-3 border-t border-white/10"
           >
+            {/* Batch / Course Duration (Mandatory) */}
+            <div>
+              <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Batch / Course Duration (Mandatory)</span>
+                </span>
+                <span className="text-[10px] text-amber-300 font-mono">e.g. 2024-2028</span>
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {BATCH_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setBatchDuration(opt)}
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                      batchDuration === opt
+                        ? "bg-sky-500/20 border-sky-400 text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                        : "bg-slate-950/60 border-white/10 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               {/* Roll Number */}
               <div className="sm:col-span-1">
@@ -362,13 +438,15 @@ export function OnboardingForm({
             <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs flex items-center gap-2.5">
               <School className="w-4 h-4 shrink-0 text-sky-400" />
               <span>
-                Your <strong>Department ({department.split(" ")[0]})</strong>, <strong>{academicYear}</strong>, <strong>Sem {semester}</strong>, and <strong>{section}</strong> precisely isolate your lectures and prevent routine cross-contamination with other batches.
+                Your <strong>Department ({department.split(" ")[0]})</strong>, <strong>Batch {batchDuration}</strong>, <strong>{academicYear}</strong>, <strong>Sem {semester}</strong>, and <strong>{section}</strong> precisely isolate your timetable lectures and attendance ledger.
               </span>
             </div>
           </motion.div>
         )}
 
-        {/* TEACHER / HOD CONDITIONAL FIELDS */}
+        {/* ============================================================== */}
+        {/* TEACHER / HOD CONDITIONAL FIELDS & ROUTINE CLAIMING            */}
+        {/* ============================================================== */}
         {role !== "Student" && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -393,10 +471,35 @@ export function OnboardingForm({
               </select>
             </div>
 
+            {/* Claim Unassigned Routine Profile Dropdown */}
+            {unclaimedSlots.length > 0 && (
+              <div className="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-2">
+                <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Claim Your Timetable Routine Slots (Recommended)</span>
+                </label>
+                <p className="text-[11px] text-slate-300">
+                  The HOD has uploaded timetable routines with unassigned faculty slots. Select your name to automatically link all scheduled lectures to your profile:
+                </p>
+                <select
+                  value={claimedFacultyName}
+                  onChange={(e) => setClaimedFacultyName(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs focus:outline-none focus:border-amber-400"
+                >
+                  <option value="">-- No timetable slot to claim (New Faculty) --</option>
+                  {unclaimedSlots.map((slot, idx) => (
+                    <option key={idx} value={slot.teacherName}>
+                      {slot.teacherName} ({slot.classCount} classes &bull; {slot.subjects.slice(0, 2).join(", ")})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2.5">
               <UserCheck className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>
-                Faculty profiles are linked to lecture routine assignments across all 4 parameters (Dept, Year, Semester, Section).
+                Faculty profiles link directly to routine attendance registers across your department without creating ghost accounts.
               </span>
             </div>
           </motion.div>
@@ -412,7 +515,7 @@ export function OnboardingForm({
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Registering 4-Parameter Profile...</span>
+                <span>Registering Profile...</span>
               </>
             ) : (
               <>

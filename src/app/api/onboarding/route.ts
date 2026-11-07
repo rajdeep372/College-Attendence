@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { UserRole } from "@/models/User";
+import Routine from "@/models/Routine";
 import { currentUser } from "@clerk/nextjs/server";
 import { 
   validateInstitutionalEmail, 
@@ -68,11 +69,13 @@ export async function POST(req: NextRequest) {
       role: requestedRole,
       department,
       rollNumber,
+      batchDuration,
       academicYear,
       semester = 1,
       section = "Section A",
       designation = "",
       phone = "",
+      claimedFacultyName,
     } = body;
 
     if (!department || !department.trim()) {
@@ -121,7 +124,7 @@ export async function POST(req: NextRequest) {
       ? (section.toString().toUpperCase().startsWith("SECTION") ? section.toString().trim() : `Section ${section.toString().trim().toUpperCase()}`)
       : "";
 
-    const updatePayload = {
+    const updatePayload: Record<string, unknown> = {
       clerkId: clerkUser.id,
       name: fullName,
       email: email.toLowerCase().trim(),
@@ -129,6 +132,7 @@ export async function POST(req: NextRequest) {
       role: finalRole,
       department: department.trim(),
       rollNumber: finalRole === "Student" ? rollNumber.trim().toUpperCase() : (rollNumber || "").trim().toUpperCase(),
+      batchDuration: finalRole === "Student" ? (batchDuration || "2024-2028").trim() : undefined,
       academicYear: finalRole === "Student" ? resolvedAcademicYear : undefined,
       semester: finalRole === "Student" ? Math.max(1, Math.min(12, Number(semester) || 1)) : 1,
       section: cleanSection,
@@ -142,6 +146,49 @@ export async function POST(req: NextRequest) {
       { $set: updatePayload },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
+
+    // If teacher/HOD claimed an unassigned routine slot, link matching routine classes
+    if (claimedFacultyName && (finalRole === "Teacher" || finalRole === "HOD")) {
+      const trimmedClaim = claimedFacultyName.trim();
+      try {
+        // 1. Update day-grouped routines
+        await Routine.updateMany(
+          {
+            department: department.trim(),
+            "classes.teacherName": new RegExp(`^${trimmedClaim}$`, "i"),
+          },
+          {
+            $set: {
+              "classes.$[elem].teacherId": savedUser._id,
+              "classes.$[elem].teacherName": savedUser.name,
+              "classes.$[elem].isUnclaimed": false,
+            },
+          },
+          {
+            arrayFilters: [{ "elem.teacherName": new RegExp(`^${trimmedClaim}$`, "i") }],
+          }
+        );
+
+        // 2. Update legacy routine fields if any
+        await Routine.updateMany(
+          {
+            department: department.trim(),
+            teacherName: new RegExp(`^${trimmedClaim}$`, "i"),
+          },
+          {
+            $set: {
+              teacherId: savedUser._id,
+              teacherName: savedUser.name,
+              isUnclaimed: false,
+            },
+          }
+        );
+
+        console.log(`[API: /api/onboarding] Linked unclaimed routine slots for '${trimmedClaim}' to teacher ${savedUser._id} (${savedUser.name}).`);
+      } catch (claimErr) {
+        console.warn("[API: /api/onboarding] Failed to link routine slots:", claimErr);
+      }
+    }
 
     const targetDashboard = getRoleDashboardPath(finalRole);
 
@@ -157,4 +204,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
-

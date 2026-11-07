@@ -540,7 +540,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                     }`}
                   >
                     {totalConducted === 0
-                      ? "0 (No Sessions Held Yet)"
+                      ? "N/A"
                       : allowedAbsences > 0
                       ? `Up to ${allowedAbsences} Classes`
                       : "0 (At Limit / Defaulter)"}
@@ -557,9 +557,9 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                 )}
 
                 <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex justify-between items-center">
-                  <span className="text-slate-300">Session Year / Semester:</span>
+                  <span className="text-slate-300">Batch / Course Duration:</span>
                   <span className="font-bold text-sky-300">
-                    {currentUser?.sessionYear || "2024-2025"} (Sem {currentUser?.semester || 1})
+                    {currentUser?.batchDuration || currentUser?.sessionYear || "Batch Unset"} (Sem {currentUser?.semester || 1})
                   </span>
                 </div>
               </div>

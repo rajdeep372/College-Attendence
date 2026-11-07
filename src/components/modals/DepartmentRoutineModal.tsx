@@ -50,7 +50,27 @@ export function DepartmentRoutineModal({
       );
       const data = await res.json();
       if (data.success && data.routines) {
-        setRoutines(data.routines);
+        const flattened: RoutineEntry[] = [];
+        for (const r of data.routines) {
+          if (r.classes && Array.isArray(r.classes) && r.classes.length > 0) {
+            for (const c of r.classes) {
+              flattened.push({
+                _id: c._id || `${r._id}_${c.timeSlot}`,
+                dayOfWeek: r.dayOfWeek,
+                timeSlot: c.timeSlot,
+                subject: c.subject,
+                semester: r.semester,
+                department: r.department,
+                teacherId: c.teacherId
+                  ? { name: c.teacherId.name, email: c.teacherId.email }
+                  : { name: c.teacherName || "Assigned Faculty" },
+              });
+            }
+          } else if (r.subject) {
+            flattened.push(r);
+          }
+        }
+        setRoutines(flattened);
       } else {
         setRoutines([]);
       }
