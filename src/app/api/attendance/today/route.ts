@@ -10,7 +10,9 @@ type DayOfWeek = "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "S
 interface PlainRoutine {
   _id: Types.ObjectId | string;
   department: string;
+  academicYear?: string;
   semester: number;
+  section?: string;
   dayOfWeek: DayOfWeek;
   subject: string;
   timeSlot: string;
@@ -23,7 +25,9 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const departmentQuery = searchParams.get("department");
+    const academicYearQuery = searchParams.get("academicYear");
     const semesterQuery = searchParams.get("semester");
+    const sectionQuery = searchParams.get("section");
 
     // 1. Determine current day of week (Map Sunday to Monday for dev convenience)
     const daysOfWeek: DayOfWeek[] = [
@@ -38,87 +42,111 @@ export async function GET(req: NextRequest) {
     const currentDayIdx = new Date().getDay();
     const activeDay: DayOfWeek = daysOfWeek[currentDayIdx] || "Monday";
 
-    // 2. Try to identify teacher from Clerk session or query
+    // 2. Identify teacher from Clerk session or database
     let teacher = null;
     try {
       const clerkUser = await currentUser();
       if (clerkUser) {
-        teacher = await User.findOne({ clerkId: clerkUser.id, role: "Teacher" });
+        teacher = await User.findOne({ clerkId: clerkUser.id, role: { $in: ["Teacher", "HOD", "Principal"] } });
       }
     } catch {
       // Dev mode fallback
     }
 
     if (!teacher) {
-      teacher = await User.findOne({ role: "Teacher" });
+      teacher = await User.findOne({ role: { $in: ["Teacher", "HOD", "Principal"] } });
       if (!teacher) {
         teacher = await User.create({
           clerkId: `teacher_seed_${Date.now()}`,
           name: "Dr. Arvind Sharma",
           email: "arvind.sharma@college.edu",
           role: "Teacher",
-          department: "Computer Science",
+          department: "Computer Science & Engineering",
           profilePicture: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
         });
       }
     }
 
-    // 3. Find today's routine for this teacher or department
-    const routineFilter: Record<string, unknown> = {};
-    if (departmentQuery) routineFilter.department = departmentQuery;
-    if (semesterQuery) routineFilter.semester = Number(semesterQuery);
+    // Determine target parameters (Department, Academic Year, Semester, Section)
+    const targetDepartment = departmentQuery || teacher?.department || "Computer Science & Engineering";
+    const targetSemester = semesterQuery ? Number(semesterQuery) : 5;
+    const targetSection = sectionQuery || "Section A";
+    
+    // Deduce academic year if not passed
+    const targetAcademicYear = academicYearQuery || (
+      targetSemester <= 2 ? "1st Year" :
+      targetSemester <= 4 ? "2nd Year" :
+      targetSemester <= 6 ? "3rd Year" : "4th Year"
+    );
+
+    // 3. Find today's routine matching exact Department + Semester + Section
+    const routineFilter: Record<string, unknown> = {
+      department: targetDepartment,
+      semester: targetSemester,
+      section: targetSection,
+      dayOfWeek: activeDay,
+    };
 
     let routine = await Routine.findOne({
       ...routineFilter,
       teacherId: teacher._id,
-      dayOfWeek: activeDay,
     })
       .populate("teacherId", "name email department")
       .lean<PlainRoutine | null>();
 
     if (!routine) {
+      routine = await Routine.findOne(routineFilter)
+        .populate("teacherId", "name email department")
+        .lean<PlainRoutine | null>();
+    }
+
+    // If still no routine today, search for any routine for this exact class
+    if (!routine) {
       routine = await Routine.findOne({
-        ...routineFilter,
-        dayOfWeek: activeDay,
+        department: targetDepartment,
+        semester: targetSemester,
+        section: targetSection,
       })
         .populate("teacherId", "name email department")
         .lean<PlainRoutine | null>();
     }
 
-    if (!routine) {
-      routine = await Routine.findOne()
-        .populate("teacherId", "name email department")
-        .lean<PlainRoutine | null>();
-    }
-
-    // If no routine exists, return null routine so teacher can specify their class
-    const targetDepartment = routine?.department || teacher?.department || "General Academic & Sciences";
-
-    // 4. Fetch all Students for this department & semester
+    // 4. Fetch Students strictly filtered by the 4 parameters (Role: Student, Department, Semester, Section)
     const studentFilter: Record<string, unknown> = {
       role: "Student",
+      department: targetDepartment,
+      semester: targetSemester,
+      section: targetSection,
     };
-    if (targetDepartment) {
-      studentFilter.department = targetDepartment;
-    }
-    if (routine?.semester) {
-      studentFilter.semester = routine.semester;
-    }
 
-    let students = await User.find(studentFilter).lean<IUser[]>();
+    let students = await User.find(studentFilter)
+      .sort({ rollNumber: 1, name: 1 })
+      .lean<IUser[]>();
 
-    // If no students in this exact department, fetch all registered students
+    // If no students in exact section/semester, do a relaxed search for this department + semester
+    // only if strictly no students match section yet, so teachers can see unsectioned or newly registered students
     if (!students || students.length === 0) {
-      students = await User.find({ role: "Student" }).lean<IUser[]>();
+      const relaxedFilter: Record<string, unknown> = {
+        role: "Student",
+        department: targetDepartment,
+        semester: targetSemester,
+      };
+      const unsectioned = await User.find(relaxedFilter).lean<IUser[]>();
+      if (unsectioned && unsectioned.length > 0) {
+        students = unsectioned;
+      }
     }
 
-    // Format students with roll numbers
-    const formattedStudents = students.map((s, idx) => ({
+    // Format students strictly with their real rollNumber from DB/Clerk
+    const formattedStudents = students.map((s) => ({
       _id: s._id.toString(),
       name: s.name,
       email: s.email,
-      roll: `2023-CS-0${(idx + 1).toString().padStart(2, "0")}`,
+      roll: s.rollNumber || (s.email.includes("@") ? s.email.split("@")[0].toUpperCase() : "ENR-" + s._id.toString().slice(-4).toUpperCase()),
       department: s.department || targetDepartment,
+      academicYear: s.academicYear || targetAcademicYear,
+      semester: s.semester || targetSemester,
+      section: s.section || targetSection,
       profilePicture: s.profilePicture || "",
     }));
 
@@ -129,12 +157,19 @@ export async function GET(req: NextRequest) {
         _id: teacher._id.toString(),
         name: teacher.name,
         email: teacher.email,
+        department: teacher.department,
       },
+      targetDepartment,
+      targetAcademicYear,
+      targetSemester,
+      targetSection,
       routine: routine ? {
         _id: routine._id ? routine._id.toString() : "",
         subject: routine.subject,
-        department: targetDepartment,
-        semester: routine.semester,
+        department: routine.department || targetDepartment,
+        academicYear: routine.academicYear || targetAcademicYear,
+        semester: routine.semester || targetSemester,
+        section: routine.section || targetSection,
         timeSlot: routine.timeSlot,
         dayOfWeek: routine.dayOfWeek || activeDay,
       } : null,

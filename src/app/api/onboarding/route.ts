@@ -68,8 +68,9 @@ export async function POST(req: NextRequest) {
       role: requestedRole,
       department,
       rollNumber,
+      academicYear,
       semester = 1,
-      section = "A",
+      section = "Section A",
       designation = "",
       phone = "",
     } = body;
@@ -110,6 +111,16 @@ export async function POST(req: NextRequest) {
       ? name.trim()
       : `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Academic Scholar";
 
+    let resolvedAcademicYear = academicYear;
+    if (!resolvedAcademicYear && finalRole === "Student") {
+      const semNum = Number(semester) || 1;
+      resolvedAcademicYear = semNum <= 2 ? "1st Year" : semNum <= 4 ? "2nd Year" : semNum <= 6 ? "3rd Year" : "4th Year";
+    }
+
+    const cleanSection = finalRole === "Student"
+      ? (section.toString().toUpperCase().startsWith("SECTION") ? section.toString().trim() : `Section ${section.toString().trim().toUpperCase()}`)
+      : "";
+
     const updatePayload = {
       clerkId: clerkUser.id,
       name: fullName,
@@ -118,8 +129,9 @@ export async function POST(req: NextRequest) {
       role: finalRole,
       department: department.trim(),
       rollNumber: finalRole === "Student" ? rollNumber.trim().toUpperCase() : (rollNumber || "").trim().toUpperCase(),
+      academicYear: finalRole === "Student" ? resolvedAcademicYear : undefined,
       semester: finalRole === "Student" ? Math.max(1, Math.min(12, Number(semester) || 1)) : 1,
-      section: finalRole === "Student" ? (section || "A").trim().toUpperCase() : "",
+      section: cleanSection,
       designation: finalRole !== "Student" ? designation.trim() : "",
       onboarded: true,
       profilePicture: clerkUser.imageUrl || "",

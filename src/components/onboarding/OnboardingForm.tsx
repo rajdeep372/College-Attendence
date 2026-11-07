@@ -16,21 +16,37 @@ import {
   Hash,
   Layers,
   BookOpen,
-  UserCheck
+  UserCheck,
+  Calendar
 } from "lucide-react";
 
-const DEPARTMENTS = [
-  "Computer Science & Engineering",
+export const DEPARTMENTS = [
+  "Computer Science & Engineering (CSE)",
+  "Information Technology (IT)",
   "Artificial Intelligence & Machine Learning (AIML)",
-  "Information Technology",
-  "Electronics & Communication Engineering",
-  "Electrical & Electronics Engineering",
-  "Mechanical Engineering",
-  "Civil Engineering",
   "Bachelor of Computer Applications (BCA)",
   "Master of Computer Applications (MCA)",
+  "Electrical & Electronics Engineering (EEE)",
+  "Electronics & Communication Engineering (ECE)",
+  "Mechanical Engineering (ME)",
+  "Civil Engineering (CE)",
   "Data Science & Analytics",
+  "Cyber Security & Forensics",
   "General Academic & Sciences",
+];
+
+export const ACADEMIC_YEARS = [
+  "1st Year",
+  "2nd Year",
+  "3rd Year",
+  "4th Year",
+];
+
+export const SECTIONS = [
+  "Section A",
+  "Section B",
+  "Section C",
+  "Section D",
 ];
 
 const DESIGNATIONS = [
@@ -54,7 +70,7 @@ export function OnboardingForm({
   initialEmail,
   initialName = "",
   initialRole = "Student",
-  initialDepartment = "Computer Science & Engineering",
+  initialDepartment = "Computer Science & Engineering (CSE)",
   initialRoll = "",
 }: OnboardingFormProps) {
   const router = useRouter();
@@ -65,13 +81,32 @@ export function OnboardingForm({
   const [name, setName] = useState(initialName);
   const [rollNumber, setRollNumber] = useState(initialRoll);
   const [department, setDepartment] = useState(initialDepartment);
-  const [semester, setSemester] = useState(5);
-  const [section, setSection] = useState("A");
+  const [academicYear, setAcademicYear] = useState<string>("3rd Year");
+  const [semester, setSemester] = useState<number>(5);
+  const [section, setSection] = useState<string>("Section A");
   const [designation, setDesignation] = useState("Assistant Professor");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Auto-sync Academic Year when Semester changes
+  const handleSemesterChange = (newSem: number) => {
+    setSemester(newSem);
+    if (newSem <= 2) setAcademicYear("1st Year");
+    else if (newSem <= 4) setAcademicYear("2nd Year");
+    else if (newSem <= 6) setAcademicYear("3rd Year");
+    else setAcademicYear("4th Year");
+  };
+
+  // Auto-sync Semester when Academic Year changes
+  const handleYearChange = (newYear: string) => {
+    setAcademicYear(newYear);
+    if (newYear === "1st Year" && semester > 2) setSemester(1);
+    else if (newYear === "2nd Year" && (semester < 3 || semester > 4)) setSemester(3);
+    else if (newYear === "3rd Year" && (semester < 5 || semester > 6)) setSemester(5);
+    else if (newYear === "4th Year" && semester < 7) setSemester(7);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,9 +133,10 @@ export function OnboardingForm({
           name: name.trim(),
           role,
           department,
-          rollNumber: role === "Student" ? rollNumber.trim().toUpperCase() : undefined,
+          academicYear: role === "Student" ? academicYear : undefined,
           semester: role === "Student" ? Number(semester) : undefined,
-          section: role === "Student" ? section.trim().toUpperCase() : undefined,
+          section: role === "Student" ? section : undefined,
+          rollNumber: role === "Student" ? rollNumber.trim().toUpperCase() : undefined,
           designation: role !== "Student" ? designation : undefined,
         }),
       });
@@ -139,90 +175,95 @@ export function OnboardingForm({
           <Sparkles className="w-3.5 h-3.5" />
           <span>Mandatory First-Time Institutional Setup</span>
         </div>
-
-        <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-          Complete Academic Registration
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+          Institutional Member Onboarding
         </h1>
-        <p className="mt-2 text-xs sm:text-sm text-slate-300 max-w-lg mx-auto leading-relaxed">
-          Link your official college credentials to your assigned department, classroom rosters, and biometric attendance records.
+        <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-md mx-auto">
+          Configure your academic hierarchy parameters to link directly to your live timetables and biometric attendance rosters.
         </p>
-
-        {/* Verified Email Chip */}
-        <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-white/10 text-xs">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-slate-400">Authenticated Email:</span>
-          <span className="font-mono text-sky-300 font-bold">{initialEmail}</span>
-        </div>
       </div>
 
       {errorMessage && (
-        <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-3">
+        <div className="mb-6 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
           <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {successMessage && (
-        <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-3">
+        <div className="mb-6 p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
           <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-400" />
           <span>{successMessage}</span>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="relative z-10 space-y-5 text-xs">
-        {/* Role Switcher Tabs */}
-        <div>
-          <label className="block text-slate-300 font-semibold mb-2">
-            Institutional Classification
-          </label>
-          <div className="grid grid-cols-2 gap-3 p-1 rounded-2xl bg-slate-950/70 border border-white/10">
-            <button
-              type="button"
-              onClick={() => setRole("Student")}
-              className={`py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                role === "Student"
-                  ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-lg border border-sky-400/40"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              <span>Student / Scholar</span>
-            </button>
+      <form onSubmit={handleSubmit} className="space-y-5 text-xs sm:text-sm relative z-10">
+        {/* Full Name & Verified Institutional Email */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1.5">
+              Full Official Name
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. John Doe"
+              className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-xs sm:text-sm"
+            />
+          </div>
 
-            <button
-              type="button"
-              onClick={() => setRole("Teacher")}
-              className={`py-3 px-4 rounded-xl flex items-center justify-center gap-2 text-xs font-bold transition-all cursor-pointer ${
-                role !== "Student"
-                  ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg border border-emerald-400/40"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Briefcase className="w-4 h-4" />
-              <span>Faculty / HOD</span>
-            </button>
+          <div>
+            <label className="block text-slate-300 font-semibold mb-1.5">
+              College Email (Verified)
+            </label>
+            <input
+              type="email"
+              disabled
+              value={initialEmail}
+              className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/5 text-slate-400 text-xs sm:text-sm cursor-not-allowed font-mono"
+            />
           </div>
         </div>
 
-        {/* Full Name */}
+        {/* Institutional Role Selector */}
         <div>
-          <label className="block text-slate-300 font-semibold mb-1">
-            Full Legal Academic Name
+          <label className="block text-slate-300 font-semibold mb-1.5">
+            Institutional Role
           </label>
-          <input
-            type="text"
-            required
-            placeholder="e.g. Aryan Sharma"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-sm"
-          />
+          <div className="grid grid-cols-3 gap-2.5">
+            {[
+              { id: "Student", label: "Student", icon: GraduationCap },
+              { id: "Teacher", label: "Faculty / Teacher", icon: Briefcase },
+              { id: "HOD", label: "Head of Dept (HOD)", icon: ShieldCheck },
+            ].map((r) => {
+              const Icon = r.icon;
+              const isSelected = role === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setRole(r.id as any)}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 font-semibold transition-all cursor-pointer pointer-events-auto ${
+                    isSelected
+                      ? "bg-sky-500/20 border-sky-400 text-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
+                      : "bg-slate-950/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-900"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-xs text-center">{r.label}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
-        {/* Academic Department */}
+        {/* 1. Academic Department (Expanded Options) */}
         <div>
-          <label className="block text-slate-300 font-semibold mb-1">
-            Academic Department & Discipline
+          <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+            <span>Academic Department</span>
+            <span className="text-[10px] text-sky-400">Parameter 1 of 4</span>
           </label>
           <select
             value={department}
@@ -237,41 +278,59 @@ export function OnboardingForm({
           </select>
         </div>
 
-        {/* STUDENT CONDITIONAL FIELDS */}
+        {/* ============================================================== */}
+        {/* STUDENT CONDITIONAL 4-PARAMETER HIERARCHY                      */}
+        {/* ============================================================== */}
         {role === "Student" && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="space-y-4 pt-2 border-t border-white/10"
+            className="space-y-4 pt-3 border-t border-white/10"
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               {/* Roll Number */}
               <div className="sm:col-span-1">
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Roll / Registration No.
+                <label className="block text-slate-300 font-semibold mb-1 text-xs">
+                  Roll / Reg. No.
                 </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 2023-CSE-042"
-                    value={rollNumber}
-                    onChange={(e) => setRollNumber(e.target.value)}
-                    className="w-full px-3.5 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white font-mono placeholder-slate-500 focus:outline-none focus:border-sky-400 uppercase text-xs"
-                  />
-                </div>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 2023-BCA-042"
+                  value={rollNumber}
+                  onChange={(e) => setRollNumber(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/80 border border-white/10 text-white font-mono placeholder-slate-500 focus:outline-none focus:border-sky-400 uppercase text-xs"
+                />
               </div>
 
-              {/* Semester */}
+              {/* 2. Academic Year */}
               <div className="sm:col-span-1">
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Current Semester
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Academic Year</span>
+                </label>
+                <select
+                  value={academicYear}
+                  onChange={(e) => handleYearChange(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs cursor-pointer font-medium"
+                >
+                  {ACADEMIC_YEARS.map((yr) => (
+                    <option key={yr} value={yr} className="bg-slate-900">
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 3. Semester (1-8) */}
+              <div className="sm:col-span-1">
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Semester</span>
                 </label>
                 <select
                   value={semester}
-                  onChange={(e) => setSemester(Number(e.target.value))}
-                  className="w-full px-3.5 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs cursor-pointer"
+                  onChange={(e) => handleSemesterChange(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs cursor-pointer font-medium"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                     <option key={sem} value={sem} className="bg-slate-900">
@@ -281,26 +340,29 @@ export function OnboardingForm({
                 </select>
               </div>
 
-              {/* Section */}
+              {/* 4. Section (CRITICAL) */}
               <div className="sm:col-span-1">
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Section / Batch
+                <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center justify-between">
+                  <span>Section (Critical)</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. A, B, or Alpha"
+                <select
                   value={section}
                   onChange={(e) => setSection(e.target.value)}
-                  className="w-full px-3.5 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 uppercase text-xs"
-                />
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950/80 border border-sky-400/40 text-amber-300 focus:outline-none focus:border-sky-400 text-xs cursor-pointer font-bold"
+                >
+                  {SECTIONS.map((sec) => (
+                    <option key={sec} value={sec} className="bg-slate-900 text-white font-normal">
+                      {sec}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            <div className="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-[11px] flex items-center gap-2">
+            <div className="p-3.5 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs flex items-center gap-2.5">
               <School className="w-4 h-4 shrink-0 text-sky-400" />
               <span>
-                Your roll number and semester determine which physical lecture halls and QR attendance sessions you are registered for.
+                Your <strong>Department ({department.split(" ")[0]})</strong>, <strong>{academicYear}</strong>, <strong>Sem {semester}</strong>, and <strong>{section}</strong> precisely isolate your lectures and prevent routine cross-contamination with other batches.
               </span>
             </div>
           </motion.div>
@@ -312,24 +374,16 @@ export function OnboardingForm({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="space-y-4 pt-2 border-t border-white/10"
+            className="space-y-4 pt-3 border-t border-white/10"
           >
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">
-                Academic Designation & Title
+              <label className="block text-slate-300 font-semibold mb-1.5">
+                Faculty Designation
               </label>
               <select
                 value={designation}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setDesignation(val);
-                  if (val.toLowerCase().includes("head of department") || val === "Head of Department (HOD)") {
-                    setRole("HOD");
-                  } else {
-                    setRole("Teacher");
-                  }
-                }}
-                className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-emerald-400 text-xs sm:text-sm cursor-pointer"
+                onChange={(e) => setDesignation(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs sm:text-sm cursor-pointer"
               >
                 {DESIGNATIONS.map((desig) => (
                   <option key={desig} value={desig} className="bg-slate-900">
@@ -339,10 +393,10 @@ export function OnboardingForm({
               </select>
             </div>
 
-            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+            <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-xs flex items-center gap-2.5">
+              <UserCheck className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>
-                Selecting &quot;Head of Department (HOD)&quot; enables branch-wide leave approvals, timetable ingestion, and faculty workload monitoring.
+                Faculty profiles are linked to lecture routine assignments across all 4 parameters (Dept, Year, Semester, Section).
               </span>
             </div>
           </motion.div>
@@ -353,17 +407,17 @@ export function OnboardingForm({
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3.5 px-6 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-[0_0_25px_rgba(56,189,248,0.4)] disabled:opacity-50 transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-6 rounded-xl font-bold text-white bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_30px_rgba(56,189,248,0.4)] transition-all cursor-pointer pointer-events-auto flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Registering Into College Ledger...</span>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span>Registering 4-Parameter Profile...</span>
               </>
             ) : (
               <>
-                <span>Complete Institutional Onboarding</span>
-                <ArrowRight className="w-4 h-4" />
+                <span>Complete Institutional Setup</span>
+                <ArrowRight className="w-5 h-5" />
               </>
             )}
           </button>
@@ -372,4 +426,3 @@ export function OnboardingForm({
     </div>
   );
 }
-

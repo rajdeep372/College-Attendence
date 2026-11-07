@@ -47,9 +47,15 @@ export async function GET(req: NextRequest) {
       }
 
       // If no student ID resolved, find any student
+      let targetStudentDoc: any = dbUser;
       if (!targetStudentId) {
         const anyStudent = await User.findOne({ role: "Student" }).lean();
-        if (anyStudent) targetStudentId = anyStudent._id as Types.ObjectId;
+        if (anyStudent) {
+          targetStudentId = anyStudent._id as Types.ObjectId;
+          targetStudentDoc = anyStudent;
+        }
+      } else if (!targetStudentDoc) {
+        targetStudentDoc = await User.findById(targetStudentId).lean();
       }
 
       // Query attendance records involving this student
@@ -113,8 +119,13 @@ export async function GET(req: NextRequest) {
 
       // If empty records, populate from the student's department routines
       if (subjectsList.length === 0) {
-        const studentDept = department || "Computer Science & Engineering";
-        const routines = await Routine.find({ department: studentDept }).limit(4).lean();
+        const studentDept = department || targetStudentDoc?.department || "Computer Science & Engineering";
+        const studentSem = targetStudentDoc?.semester || 1;
+        const studentSec = targetStudentDoc?.section || "Section A";
+        let routines = await Routine.find({ department: studentDept, semester: studentSem, section: studentSec }).limit(4).lean();
+        if (routines.length === 0) {
+          routines = await Routine.find({ department: studentDept }).limit(4).lean();
+        }
         
         if (routines.length > 0) {
           routines.forEach((r) => {
@@ -173,19 +184,31 @@ export async function GET(req: NextRequest) {
       const rawDay = daysOfWeek[new Date().getDay()] || "Monday";
       const activeDay = rawDay === "Sunday" ? "Monday" : rawDay;
 
-      const studentDept = department || dbUser?.department || "Computer Science & Engineering";
+      const studentDept = department || targetStudentDoc?.department || "Computer Science & Engineering";
+      const studentSem = targetStudentDoc?.semester || 1;
+      const studentSec = targetStudentDoc?.section || "Section A";
+
       const routinesToday = await Routine.find({
         department: studentDept,
+        semester: studentSem,
+        section: studentSec,
         dayOfWeek: activeDay as any,
       })
         .populate("teacherId", "name email")
         .sort({ timeSlot: 1 })
         .lean();
 
-      // If no routines for today, fetch routines for the department to ensure schedule is visible
+      // If no routines for today, fetch routines strictly for this department, semester, and section
       const fallbackRoutines = routinesToday.length > 0 
         ? routinesToday 
-        : await Routine.find({ department: studentDept }).populate("teacherId", "name email").limit(4).lean();
+        : await Routine.find({ 
+            department: studentDept,
+            semester: studentSem,
+            section: studentSec,
+          })
+            .populate("teacherId", "name email")
+            .limit(4)
+            .lean();
 
       const todayRoutines = fallbackRoutines.map((r: any) => ({
         _id: r._id.toString(),
@@ -287,6 +310,10 @@ export async function GET(req: NextRequest) {
         code: r.subject.split(" ")[0] || `CS-${500 + idx * 2}`,
         title: r.subject,
         time: r.timeSlot,
+        department: r.department,
+        academicYear: r.academicYear || (r.semester <= 2 ? "1st Year" : r.semester <= 4 ? "2nd Year" : r.semester <= 6 ? "3rd Year" : "4th Year"),
+        semester: r.semester,
+        section: r.section || "Section A",
         hall: `Hall ${r.semester}0${idx + 1}`,
         status: idx === 0 ? "Completed" : idx === 1 ? "Live Now" : "Upcoming",
         attendance: idx === 0 ? "Turnout Logged" : idx === 1 ? "In Session" : "Pending",

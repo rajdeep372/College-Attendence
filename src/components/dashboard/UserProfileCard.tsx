@@ -79,7 +79,7 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
               </span>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-xs text-slate-300">
               <span className="flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-sky-400" />
                 <span>{email}</span>
@@ -88,6 +88,24 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
                 <Building className="w-3.5 h-3.5 text-cyan-400" />
                 <span>{department}</span>
               </span>
+              {user?.rollNumber && (
+                <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 font-mono text-[11px] text-sky-300">
+                  {user.rollNumber}
+                </span>
+              )}
+              {role === "Student" && (
+                <div className="flex items-center gap-1.5 text-[11px]">
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 font-bold text-amber-300">
+                    {user?.section || "Section A"}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/20 text-sky-300">
+                    Sem {user?.semester || 1}
+                  </span>
+                  <span className="text-slate-400 text-[10px]">
+                    ({user?.academicYear || "1st Year"})
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>

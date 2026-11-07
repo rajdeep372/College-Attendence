@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   UploadCloud, 
   Sparkles, 
-  FileImage, 
-  CheckCircle2, 
+  Check, 
+  CheckCircle2,
   AlertCircle, 
   Clock, 
   UserCheck, 
@@ -15,35 +15,63 @@ import {
   Building,
   GraduationCap,
   Layers,
-  Check
+  BookOpen
 } from "lucide-react";
+import { DEPARTMENTS, ACADEMIC_YEARS, SECTIONS } from "@/components/onboarding/OnboardingForm";
 
 interface ParsedClass {
   dayOfWeek: string;
   timeSlot: string;
+  paperCode?: string;
   subject: string;
   teacher: string;
   semester: number;
+  academicYear?: string;
+  section?: string;
   department: string;
 }
 
 export function RoutineUploadDropzone({
-  defaultDepartment = "Computer Science",
+  defaultDepartment = "Computer Science & Engineering (CSE)",
   defaultSemester = 5,
+  defaultAcademicYear = "3rd Year",
+  defaultSection = "Section A",
 }: {
   defaultDepartment?: string;
   defaultSemester?: number;
+  defaultAcademicYear?: string;
+  defaultSection?: string;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [department, setDepartment] = useState(defaultDepartment);
+  const [academicYear, setAcademicYear] = useState(defaultAcademicYear);
   const [semester, setSemester] = useState(defaultSemester);
+  const [section, setSection] = useState(defaultSection);
+
   const [isLoading, setIsLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [parsedResults, setParsedResults] = useState<ParsedClass[] | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync Year and Semester
+  const handleSemesterChange = (newSem: number) => {
+    setSemester(newSem);
+    if (newSem <= 2) setAcademicYear("1st Year");
+    else if (newSem <= 4) setAcademicYear("2nd Year");
+    else if (newSem <= 6) setAcademicYear("3rd Year");
+    else setAcademicYear("4th Year");
+  };
+
+  const handleYearChange = (newYear: string) => {
+    setAcademicYear(newYear);
+    if (newYear === "1st Year" && semester > 2) setSemester(1);
+    else if (newYear === "2nd Year" && (semester < 3 || semester > 4)) setSemester(3);
+    else if (newYear === "3rd Year" && (semester < 5 || semester > 6)) setSemester(5);
+    else if (newYear === "4th Year" && semester < 7) setSemester(7);
+  };
 
   const handleFileChange = (selectedFile: File) => {
     if (!selectedFile.type.startsWith("image/") && !selectedFile.type.includes("pdf")) {
@@ -84,7 +112,9 @@ export function RoutineUploadDropzone({
       const formData = new FormData();
       formData.append("file", file);
       formData.append("department", department);
+      formData.append("academicYear", academicYear);
       formData.append("semester", semester.toString());
+      formData.append("section", section);
       formData.append("save", "true"); // Bulk insert into MongoDB
 
       const res = await fetch("/api/routine/parse", {
@@ -101,7 +131,7 @@ export function RoutineUploadDropzone({
       setParsedResults(data.data || []);
       setStatusMessage(
         data.isAiSimulated
-          ? `Extracted & Saved ${data.count} classes into MongoDB Routine collection (AI Simulation Mode).`
+          ? `Extracted & Saved ${data.count} classes into MongoDB Routine collection for ${department} (${academicYear} • Sem ${semester} • ${section}).`
           : `Extracted & Saved ${data.count} classes into MongoDB via Gemini Vision AI.`
       );
     } catch (err: unknown) {
@@ -131,13 +161,13 @@ export function RoutineUploadDropzone({
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 mb-2">
             <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            <span>Multimodal Gemini AI Engine</span>
+            <span>Multimodal Gemini AI Engine &bull; Strict 4-Parameter Mapping</span>
           </div>
           <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            AI Routine Image Parser & Bulk Database Sync
+            Smart AI Timetable Parser & Database Sync
           </h3>
-          <p className="text-xs sm:text-sm text-slate-300 mt-1">
-            Upload an image or timetable snapshot. Gemini extracts schedule times, subjects, and teachers, and bulk inserts them into MongoDB.
+          <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-2xl">
+            Upload complex college routine images. The AI resolves main timetable grid slots, omits lunch breaks, maps multi-period labs, cross-references paper codes to faculty names, and binds strictly to Year, Semester, and Section.
           </p>
         </div>
 
@@ -154,8 +184,9 @@ export function RoutineUploadDropzone({
         </div>
       </div>
 
-      {/* Target Parameters Selector (Department & Semester) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 p-4 rounded-2xl bg-slate-900/60 border border-white/5">
+      {/* Target 4-Parameter Hierarchy Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6 p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-xs">
+        {/* 1. Department */}
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
             <Building className="w-3.5 h-3.5 text-sky-400" />
@@ -166,27 +197,66 @@ export function RoutineUploadDropzone({
             onChange={(e) => setDepartment(e.target.value)}
             className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-sky-500/20 text-white text-xs focus:outline-none focus:border-sky-400 transition-colors"
           >
-            <option value="Computer Science">Computer Science & Engineering</option>
-            <option value="Electronics & Communication">Electronics & Communication</option>
-            <option value="Mechanical Engineering">Mechanical Engineering</option>
-            <option value="Civil Engineering">Civil Engineering</option>
-            <option value="Information Technology">Information Technology</option>
+            {DEPARTMENTS.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
           </select>
         </div>
 
+        {/* 2. Academic Year */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <Layers className="w-3.5 h-3.5 text-purple-400" />
+            <span>Academic Year</span>
+          </label>
+          <select
+            value={academicYear}
+            onChange={(e) => handleYearChange(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-sky-500/20 text-white text-xs focus:outline-none focus:border-sky-400 transition-colors font-medium"
+          >
+            {ACADEMIC_YEARS.map((yr) => (
+              <option key={yr} value={yr}>
+                {yr}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 3. Semester */}
         <div>
           <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
             <GraduationCap className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Academic Semester</span>
+            <span>Semester</span>
           </label>
           <select
             value={semester}
-            onChange={(e) => setSemester(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-sky-500/20 text-white text-xs focus:outline-none focus:border-sky-400 transition-colors"
+            onChange={(e) => handleSemesterChange(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-sky-500/20 text-white text-xs focus:outline-none focus:border-sky-400 transition-colors font-medium"
           >
             {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
               <option key={sem} value={sem}>
-                Semester {sem} (Batch {sem <= 4 ? "Junior" : "Senior"})
+                Semester {sem}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* 4. Section (CRITICAL) */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center gap-1.5">
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+            <span>Section (Critical)</span>
+          </label>
+          <select
+            value={section}
+            onChange={(e) => setSection(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-slate-800/80 border border-amber-500/30 text-amber-300 text-xs focus:outline-none focus:border-amber-400 transition-colors font-bold"
+          >
+            {SECTIONS.map((sec) => (
+              <option key={sec} value={sec}>
+                {sec}
               </option>
             ))}
           </select>
@@ -288,7 +358,7 @@ export function RoutineUploadDropzone({
             ) : (
               <>
                 <Sparkles className="w-4 h-4" />
-                <span>Parse & Save Routine</span>
+                <span>Parse & Bind to {section}</span>
               </>
             )}
           </button>
@@ -303,10 +373,12 @@ export function RoutineUploadDropzone({
             animate={{ opacity: 1, y: 0 }}
             className="mt-6 pt-6 border-t border-white/10"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <h4 className="text-sm font-bold text-white flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-sky-400" />
-                <span>Extracted Schedule &bull; {department} (Sem {semester})</span>
+                <span>
+                  Extracted Schedule &bull; {department.split(" ")[0]} ({academicYear} &bull; Sem {semester} &bull; <strong className="text-amber-300">{section}</strong>)
+                </span>
               </h4>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
                 {parsedResults.length} Lectures Saved
@@ -319,9 +391,9 @@ export function RoutineUploadDropzone({
                   <tr>
                     <th className="px-4 py-3">Day</th>
                     <th className="px-4 py-3">Time Slot</th>
-                    <th className="px-4 py-3">Subject / Course</th>
-                    <th className="px-4 py-3">Faculty / Teacher</th>
-                    <th className="px-4 py-3 text-right">Status</th>
+                    <th className="px-4 py-3">Resolved Subject</th>
+                    <th className="px-4 py-3">Assigned Faculty</th>
+                    <th className="px-4 py-3 text-right">Target Batch</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -344,8 +416,8 @@ export function RoutineUploadDropzone({
                         <span>{item.teacher}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400">
-                          In Routine DB
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          {section}
                         </span>
                       </td>
                     </tr>
@@ -359,4 +431,3 @@ export function RoutineUploadDropzone({
     </div>
   );
 }
-

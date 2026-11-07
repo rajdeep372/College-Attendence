@@ -148,6 +148,12 @@ export async function POST(req: NextRequest) {
         absentStudents: [studentObjectId],
         presentStudents: [],
         date: new Date(),
+        department: student.department || defaultRoutine?.department || "Computer Science & Engineering",
+        academicYear: student.academicYear || "3rd Year",
+        semester: student.semester || defaultRoutine?.semester || 1,
+        section: student.section || defaultRoutine?.section || "Section A",
+        subject: defaultRoutine?.subject || "Core Curriculum Lecture",
+        teacherName: defaultTeacher?.name || "Faculty Instructor",
       });
     }
 

@@ -23,6 +23,9 @@ interface DigitalIdModalProps {
     email?: string;
     role?: string;
     department?: string;
+    academicYear?: string;
+    semester?: number;
+    section?: string;
     rollNumber?: string;
     profilePicture?: string;
     clerkId?: string;
@@ -142,6 +145,13 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                       </div>
                       <div className="text-[11px] text-slate-300 truncate mt-1">
                         {dept}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-300">
+                        <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
+                          {user?.section || "Section A"}
+                        </span>
+                        <span>&bull; Sem {user?.semester || 1}</span>
+                        <span className="text-slate-400">({user?.academicYear || "1st Year"})</span>
                       </div>
                     </div>
                   </div>

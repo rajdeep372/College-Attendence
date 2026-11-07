@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file") as File | null;
     const customDepartment = (formData.get("department") as string) || "Bachelor of Computer Applications (BCA)";
     const customSemester = Number(formData.get("semester")) || 5;
+    const customAcademicYear = (formData.get("academicYear") as string) || (customSemester <= 2 ? "1st Year" : customSemester <= 4 ? "2nd Year" : customSemester <= 6 ? "3rd Year" : "4th Year");
+    const customSection = (formData.get("section") as string) || "Section A";
     const shouldSave = formData.get("save") !== "false"; // Default true
 
     if (!file) {
@@ -123,10 +125,11 @@ Clean up course codes, teacher honorifics (Dr./Prof.), and format times consiste
     // If shouldSave is true, save directly into MongoDB Routine collection
     let insertedRoutines: any[] = [];
     if (shouldSave && parsedSchedules.length > 0) {
-      // 1. Clean existing routines for this specific department & semester to prevent stale duplicates
+      // 1. Clean existing routines strictly for this specific department, semester & section to prevent stale duplicates
       await Routine.deleteMany({
         department: customDepartment,
         semester: customSemester,
+        section: customSection,
       });
 
       // 2. Prepare routine documents with valid Teacher User ObjectIds
@@ -156,7 +159,9 @@ Clean up course codes, teacher honorifics (Dr./Prof.), and format times consiste
 
           return {
             department: item.department,
+            academicYear: customAcademicYear,
             semester: item.semester,
+            section: customSection,
             dayOfWeek: item.dayOfWeek,
             subject: item.subject,
             timeSlot: item.timeSlot,
@@ -367,6 +372,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const department = searchParams.get("department");
     const semester = searchParams.get("semester");
+    const section = searchParams.get("section");
+    const academicYear = searchParams.get("academicYear");
 
     const query: Record<string, unknown> = {};
     if (department) {
@@ -374,6 +381,12 @@ export async function GET(req: NextRequest) {
     }
     if (semester) {
       query.semester = Number(semester);
+    }
+    if (section) {
+      query.section = section;
+    }
+    if (academicYear) {
+      query.academicYear = academicYear;
     }
 
     const routines = await Routine.find(query)

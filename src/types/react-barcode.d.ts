@@ -38,3 +38,4 @@ declare module "react-barcode" {
   const Barcode: React.FC<BarcodeProps>;
   export default Barcode;
 }
+

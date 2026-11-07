@@ -20,6 +20,7 @@ export interface SerializedUser {
   role: UserRole;
   department: string;
   rollNumber: string;
+  academicYear?: string;
   semester?: number;
   section?: string;
   designation?: string;
@@ -139,8 +140,9 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       role: dbUser.role,
       department: dbUser.department || dynamicDepartment,
       rollNumber: dbUser.rollNumber || dynamicRoll,
+      academicYear: dbUser.academicYear || "1st Year",
       semester: dbUser.semester || 1,
-      section: dbUser.section || "A",
+      section: dbUser.section || "Section A",
       designation: dbUser.designation || "",
       onboarded: Boolean(dbUser.onboarded),
       profilePicture: dbUser.profilePicture || clerkUser.imageUrl || "",

@@ -8,6 +8,7 @@ export interface IAttendance extends Document {
   academicYear?: string | number;
   department: string;
   semester: number;
+  section: string;
   routineId?: Types.ObjectId;
   presentStudents: Types.ObjectId[];
   absentStudents: Types.ObjectId[];
@@ -58,6 +59,13 @@ const AttendanceSchema = new Schema<IAttendance>(
       default: 1,
       index: true,
     },
+    section: {
+      type: String,
+      required: [true, "Section is required"],
+      trim: true,
+      default: "Section A",
+      index: true,
+    },
     routineId: {
       type: Schema.Types.ObjectId,
       ref: "Routine",
@@ -90,8 +98,9 @@ const AttendanceSchema = new Schema<IAttendance>(
   }
 );
 
-// Compound index for querying attendance by department, semester, and date
-AttendanceSchema.index({ department: 1, semester: 1, date: -1 });
+// Compound index for querying attendance by department, semester, section, and date
+AttendanceSchema.index({ department: 1, semester: 1, section: 1, date: -1 });
+AttendanceSchema.index({ department: 1, academicYear: 1, semester: 1, section: 1 });
 
 const Attendance: Model<IAttendance> =
   (mongoose.models && mongoose.models.Attendance) ||

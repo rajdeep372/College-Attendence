@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       academicYear,
       department: bodyDept,
       semester: bodySemester,
+      section: bodySection,
       presentStudents = [], 
       absentStudents = [], 
       markedBy, 
@@ -62,7 +63,12 @@ export async function POST(req: NextRequest) {
     const finalTimeSlot = timeSlot || routineDoc?.timeSlot || `${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
     const finalDepartment = resolvedDept || routineDoc?.department || "General Academic & Sciences";
     const finalSemester = Number(bodySemester) || routineDoc?.semester || 1;
-    const finalAcademicYear = academicYear || new Date().getFullYear();
+    const finalSection = bodySection || routineDoc?.section || "Section A";
+    const finalAcademicYear = academicYear || routineDoc?.academicYear || (
+      finalSemester <= 2 ? "1st Year" :
+      finalSemester <= 4 ? "2nd Year" :
+      finalSemester <= 6 ? "3rd Year" : "4th Year"
+    );
     const sessionDate = date ? new Date(date) : new Date();
 
     // Clean up student IDs
@@ -83,6 +89,7 @@ export async function POST(req: NextRequest) {
       academicYear: finalAcademicYear,
       department: finalDepartment,
       semester: finalSemester,
+      section: finalSection,
       routineId: routineDoc?._id || undefined,
       presentStudents: validPresentIds,
       absentStudents: validAbsentIds,

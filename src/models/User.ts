@@ -10,6 +10,7 @@ export interface IUser extends Document {
   role: UserRole;
   department: string;
   rollNumber?: string;
+  academicYear?: string;
   semester?: number;
   section?: string;
   designation?: string;
@@ -75,16 +76,24 @@ const UserSchema = new Schema<IUser>(
       default: "",
       index: true,
     },
+    academicYear: {
+      type: String,
+      enum: ["1st Year", "2nd Year", "3rd Year", "4th Year"],
+      default: "1st Year",
+      index: true,
+    },
     semester: {
       type: Number,
       min: 1,
       max: 12,
       default: 1,
+      index: true,
     },
     section: {
       type: String,
       trim: true,
-      default: "A",
+      default: "Section A",
+      index: true,
     },
     designation: {
       type: String,
@@ -124,6 +133,9 @@ const UserSchema = new Schema<IUser>(
     timestamps: true,
   }
 );
+
+UserSchema.index({ department: 1, semester: 1, section: 1, role: 1 });
+UserSchema.index({ department: 1, academicYear: 1, section: 1 });
 
 // Prevent model overwrite error during Next.js App Router hot reloads
 const User: Model<IUser> =

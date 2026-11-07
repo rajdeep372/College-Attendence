@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const department = searchParams.get("department");
     const semester = searchParams.get("semester");
+    const section = searchParams.get("section");
+    const academicYear = searchParams.get("academicYear");
     const format = searchParams.get("format") || "xlsx";
 
     // Build filter
@@ -21,6 +23,12 @@ export async function GET(req: NextRequest) {
     }
     if (semester && semester !== "all") {
       filter.semester = parseInt(semester, 10);
+    }
+    if (section && section !== "all") {
+      filter.section = section;
+    }
+    if (academicYear && academicYear !== "all") {
+      filter.academicYear = academicYear;
     }
 
     const records = await Attendance.find(filter)
@@ -42,8 +50,9 @@ export async function GET(req: NextRequest) {
         "Teacher Name": "Institutional Ledger",
         "Class / Subject": "No Recorded Sessions Yet",
         "Department": department || "College-Wide",
+        "Academic Year": academicYear || "All",
         "Semester": semester || "All",
-        "Academic Year": new Date().getFullYear(),
+        "Section": section || "All",
         "Present Count": 0,
         "Absent Count": 0,
         "Turnout Percentage": "0.0%",
@@ -77,8 +86,9 @@ export async function GET(req: NextRequest) {
           "Teacher Name": rec.teacherName || teacher?.name || "Faculty",
           "Class / Subject": rec.subject || routine?.subject || "Core Lecture",
           "Department": rec.department || routine?.department || department || "General",
+          "Academic Year": rec.academicYear || "3rd Year",
           "Semester": rec.semester || routine?.semester || 1,
-          "Academic Year": rec.academicYear || new Date().getFullYear(),
+          "Section": rec.section || routine?.section || section || "Section A",
           "Present Count": presentCount,
           "Absent Count": absentCount,
           "Turnout Percentage": pct,
