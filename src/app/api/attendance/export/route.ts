@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
 import Routine from "@/models/Routine";
 import User from "@/models/User";
+import * as XLSX from "xlsx";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,78 +12,44 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const department = searchParams.get("department");
     const semester = searchParams.get("semester");
-    const format = searchParams.get("format") || "csv";
+    const format = searchParams.get("format") || "xlsx";
 
     // Build filter
-    const routineFilter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = {};
     if (department && department !== "all") {
-      routineFilter.department = department;
+      filter.department = department;
     }
     if (semester && semester !== "all") {
-      routineFilter.semester = parseInt(semester, 10);
+      filter.semester = parseInt(semester, 10);
     }
 
-    let matchingRoutineIds: unknown[] = [];
-    if (Object.keys(routineFilter).length > 0) {
-      const routines = await Routine.find(routineFilter).select("_id").lean();
-      matchingRoutineIds = routines.map((r) => r._id);
-    }
-
-    const attendanceFilter: Record<string, unknown> = {};
-    if (matchingRoutineIds.length > 0) {
-      attendanceFilter.routineId = { $in: matchingRoutineIds };
-    }
-
-    const records = await Attendance.find(attendanceFilter)
+    const records = await Attendance.find(filter)
       .sort({ date: -1 })
-      .limit(200)
+      .limit(500)
       .populate("routineId", "subject department semester timeSlot")
       .populate("markedBy", "name email")
       .populate("presentStudents", "name rollNumber email")
       .populate("absentStudents", "name rollNumber email")
       .lean();
 
-    // Prepare CSV rows
-    const headers = [
-      "Session Date",
-      "Department",
-      "Semester",
-      "Course Subject",
-      "Time Slot",
-      "Instructor",
-      "Present Students Count",
-      "Absent Students Count",
-      "Turnout Percentage",
-      "Present Student Rolls",
-      "Absent Student Rolls",
-    ];
-
-    const escapeCsv = (str: string | number | undefined | null) => {
-      if (str === null || str === undefined) return '""';
-      const clean = String(str).replace(/"/g, '""');
-      return `"${clean}"`;
-    };
-
-    const rows: string[] = [];
-    rows.push(headers.join(","));
+    // Prepare structured Excel data rows
+    const dataRows = [];
 
     if (records.length === 0) {
-      // Add informational row
-      rows.push(
-        [
-          escapeCsv(new Date().toISOString().split("T")[0]),
-          escapeCsv(department || "Campus-Wide"),
-          escapeCsv("All"),
-          escapeCsv("No Sessions Recorded Yet"),
-          escapeCsv("N/A"),
-          escapeCsv("System Ledger"),
-          escapeCsv(0),
-          escapeCsv(0),
-          escapeCsv("0.0%"),
-          escapeCsv("N/A"),
-          escapeCsv("N/A"),
-        ].join(",")
-      );
+      dataRows.push({
+        "Date": new Date().toISOString().split("T")[0],
+        "Time Slot": "N/A",
+        "Teacher Name": "Institutional Ledger",
+        "Class / Subject": "No Recorded Sessions Yet",
+        "Department": department || "College-Wide",
+        "Semester": semester || "All",
+        "Academic Year": new Date().getFullYear(),
+        "Present Count": 0,
+        "Absent Count": 0,
+        "Turnout Percentage": "0.0%",
+        "Present Student Rolls": "None",
+        "Absent Student Rolls": "None",
+      });
     } else {
       for (const rec of records) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -97,38 +64,48 @@ export async function GET(req: NextRequest) {
         const presentCount = presents.length;
         const absentCount = absents.length;
         const total = presentCount + absentCount;
-        const percent = total > 0 ? ((presentCount / total) * 100).toFixed(1) + "%" : "0.0%";
+        const pct = total > 0 ? ((presentCount / total) * 100).toFixed(1) + "%" : "0.0%";
 
         const presentRolls = presents.map((s) => s.rollNumber || s.name).join("; ");
         const absentRolls = absents.map((s) => s.rollNumber || s.name).join("; ");
 
         const dateStr = rec.date ? new Date(rec.date).toISOString().split("T")[0] : "N/A";
 
-        rows.push(
-          [
-            escapeCsv(dateStr),
-            escapeCsv(routine?.department || department || "General"),
-            escapeCsv(routine?.semester || 5),
-            escapeCsv(routine?.subject || "Core Lecture"),
-            escapeCsv(routine?.timeSlot || "Scheduled Slot"),
-            escapeCsv(teacher?.name || "Faculty Member"),
-            escapeCsv(presentCount),
-            escapeCsv(absentCount),
-            escapeCsv(percent),
-            escapeCsv(presentRolls),
-            escapeCsv(absentRolls),
-          ].join(",")
-        );
+        dataRows.push({
+          "Date": dateStr,
+          "Time Slot": rec.timeSlot || routine?.timeSlot || "Scheduled Slot",
+          "Teacher Name": rec.teacherName || teacher?.name || "Faculty",
+          "Class / Subject": rec.subject || routine?.subject || "Core Lecture",
+          "Department": rec.department || routine?.department || department || "General",
+          "Semester": rec.semester || routine?.semester || 1,
+          "Academic Year": rec.academicYear || new Date().getFullYear(),
+          "Present Count": presentCount,
+          "Absent Count": absentCount,
+          "Turnout Percentage": pct,
+          "Present Student Rolls": presentRolls || "None",
+          "Absent Student Rolls": absentRolls || "None",
+        });
       }
     }
 
-    const csvOutput = rows.join("\r\n");
-    const filename = `attendance-audit-${department ? department.toLowerCase().replace(/\s+/g, "-") : "all"}-${new Date().toISOString().split("T")[0]}.csv`;
+    // Build Excel Workbook using xlsx
+    const worksheet = XLSX.utils.json_to_sheet(dataRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance Records");
 
-    return new NextResponse(csvOutput, {
+    // Auto-fit column widths
+    const columnKeys = Object.keys(dataRows[0]);
+    worksheet["!cols"] = columnKeys.map((key) => ({
+      wch: Math.max(key.length, 14),
+    }));
+
+    const excelBuffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    const filename = `attendance-audit-${department ? department.toLowerCase().replace(/\s+/g, "-") : "campus"}-${new Date().toISOString().split("T")[0]}.xlsx`;
+
+    return new NextResponse(excelBuffer, {
       status: 200,
       headers: {
-        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${filename}"`,
         "Cache-Control": "no-store, max-age=0",
       },
@@ -148,4 +125,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-

@@ -22,90 +22,21 @@ export async function POST(req: NextRequest) {
   try {
     await connectToDatabase();
 
-    // 1. Fetch all students from MongoDB
-    let students = await User.find({ role: "Student" }).lean<IUser[]>();
+    // 1. Fetch real students from MongoDB
+    const students = await User.find({ role: "Student" }).lean<IUser[]>();
 
-    // If no students exist yet in database, provision a realistic sample cohort for demo testing
-    if (!students || students.length === 0) {
-      const sampleStudents = [
-        {
-          clerkId: "student_demo_1",
-          name: "Vikram Malhotra",
-          email: "vikram.malhotra@college.edu",
-          role: "Student",
-          department: "Computer Science",
-        },
-        {
-          clerkId: "student_demo_2",
-          name: "Pooja Hegde",
-          email: "pooja.hegde@college.edu",
-          role: "Student",
-          department: "Computer Science",
-        },
-        {
-          clerkId: "student_demo_3",
-          name: "Rohan Verma",
-          email: "rohan.verma@college.edu",
-          role: "Student",
-          department: "Computer Science",
-        },
-        {
-          clerkId: "student_demo_4",
-          name: "Ananya Sen",
-          email: "ananya.sen@college.edu",
-          role: "Student",
-          department: "Computer Science",
-        },
-      ];
-      await User.insertMany(sampleStudents);
-      students = await User.find({ role: "Student" }).lean<IUser[]>();
-    }
+    // 2. Fetch real attendance records sorted by date descending
+    const attendanceRecords = await Attendance.find().sort({ date: -1 }).lean<IAttendance[]>();
 
-    // 2. Fetch all attendance records sorted by date descending
-    let attendanceRecords = await Attendance.find().sort({ date: -1 }).lean<IAttendance[]>();
-
-    // If no attendance records exist yet, generate sample attendance records to simulate real class history
-    if (!attendanceRecords || attendanceRecords.length < 5) {
-      let sampleRoutine = await Routine.findOne();
-      if (!sampleRoutine) {
-        let teacher = await User.findOne({ role: "Teacher" });
-        if (!teacher) {
-          teacher = await User.create({
-            clerkId: `teacher_default_${Date.now()}`,
-            name: "Dr. Arvind Sharma",
-            email: "sharma.faculty@college.edu",
-            role: "Teacher",
-            department: "Computer Science",
-          });
-        }
-        sampleRoutine = await Routine.create({
-          department: "Computer Science",
-          semester: 5,
-          dayOfWeek: "Monday",
-          subject: "CS-501 Operating Systems",
-          timeSlot: "10:00 AM - 11:00 AM",
-          teacherId: teacher._id,
-        });
-      }
-
-      const teacher = await User.findOne({ role: "Teacher" });
-      const now = new Date();
-
-      // Seed 6 days of attendance
-      const seedRecords = [1, 2, 3, 4, 5, 6].map((dayOffset) => {
-        const recordDate = new Date(now.getTime() - dayOffset * 24 * 60 * 60 * 1000);
-        // Student 1 & 2 will be absent multiple times to demonstrate consecutive absences and <75%
-        return {
-          date: recordDate,
-          routineId: sampleRoutine!._id,
-          presentStudents: [students[2]?._id, students[3]?._id].filter(Boolean),
-          absentStudents: [students[0]?._id, students[1]?._id].filter(Boolean),
-          markedBy: teacher?._id || students[0]._id,
-        };
+    if (!students || students.length === 0 || !attendanceRecords || attendanceRecords.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: "No attendance defaulters detected in institutional ledger.",
+        evaluatedStudentsCount: students ? students.length : 0,
+        atRiskStudentsCount: 0,
+        emailsDispatched: 0,
+        students: [],
       });
-
-      await Attendance.insertMany(seedRecords);
-      attendanceRecords = await Attendance.find().sort({ date: -1 }).lean<IAttendance[]>();
     }
 
     // 3. Calculate metrics for each student
@@ -138,15 +69,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Default calculation if student had zero logged sessions
-      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 64.0;
-      const effectiveConsecutive = total > 0 ? consecutiveAbsences : 3;
+      // Real calculation from database attendance logs
+      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 100.0;
+      const effectiveConsecutive = consecutiveAbsences;
 
       const riskReasons: string[] = [];
-      if (percentage < 75) {
+      if (total > 0 && percentage < 75) {
         riskReasons.push(`Attendance below 75% limit (${percentage}%)`);
       }
-      if (effectiveConsecutive >= 3) {
+      if (total > 0 && effectiveConsecutive >= 3) {
         riskReasons.push(`${effectiveConsecutive} consecutive days absent without notice`);
       }
 
@@ -155,10 +86,10 @@ export async function POST(req: NextRequest) {
           id: studentIdStr,
           name: student.name,
           email: student.email,
-          department: student.department || "Computer Science",
+          department: student.department || "General Academic & Sciences",
           attendancePercentage: percentage,
-          totalClasses: total || 10,
-          attendedClasses: attended || 6,
+          totalClasses: total,
+          attendedClasses: attended,
           consecutiveAbsences: effectiveConsecutive,
           riskReasons,
         });
@@ -272,14 +203,14 @@ export async function GET() {
         }
       }
 
-      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 68.5;
-      const effectiveConsecutive = total > 0 ? consecutiveAbsences : 3;
+      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 100.0;
+      const effectiveConsecutive = consecutiveAbsences;
 
       const riskReasons: string[] = [];
-      if (percentage < 75) {
+      if (total > 0 && percentage < 75) {
         riskReasons.push(`Below 75% limit (${percentage}%)`);
       }
-      if (effectiveConsecutive >= 3) {
+      if (total > 0 && effectiveConsecutive >= 3) {
         riskReasons.push(`${effectiveConsecutive} consecutive days absent`);
       }
 
@@ -288,10 +219,10 @@ export async function GET() {
           id: studentIdStr,
           name: student.name,
           email: student.email,
-          department: student.department || "Computer Science",
+          department: student.department || "General Academic & Sciences",
           attendancePercentage: percentage,
-          totalClasses: total || 12,
-          attendedClasses: attended || 8,
+          totalClasses: total,
+          attendedClasses: attended,
           consecutiveAbsences: effectiveConsecutive,
           riskReasons,
         });

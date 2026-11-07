@@ -1,5 +1,17 @@
 export type InstitutionalRole = "Principal" | "HOD" | "Teacher" | "Student";
 
+/**
+ * Hardcoded Supreme Principal God-Mode Super-Admin email
+ */
+export const PRINCIPAL_SUPERADMIN_EMAIL = "chatterjeer477@gmail.com";
+
+export function isPrincipalSuperAdmin(email?: string | null): boolean {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  const envSuperAdmin = (process.env.PRINCIPAL_SUPERADMIN_EMAIL || "").toLowerCase().trim();
+  return clean === PRINCIPAL_SUPERADMIN_EMAIL || (Boolean(envSuperAdmin) && clean === envSuperAdmin);
+}
+
 export const DISALLOWED_EMAIL_DOMAINS = [
   "gmail.com",
   "googlemail.com",
@@ -169,6 +181,18 @@ export function validateInstitutionalEmail(email?: string | null): EmailValidati
     return { valid: false, error: "Incomplete email address." };
   }
 
+  // Supreme Principal God-Mode Super-Admin bypass
+  if (isPrincipalSuperAdmin(cleanEmail)) {
+    return {
+      valid: true,
+      domain: domain || "academiasync.edu",
+      prefix: prefix || "principal",
+      role: "Principal",
+      department: "Executive Institutional Leadership",
+      rollNumber: "ADM-PRIN-SUPERADMIN",
+    };
+  }
+
   // Reject personal / commercial email providers
   if (DISALLOWED_EMAIL_DOMAINS.includes(domain)) {
     return {
@@ -195,6 +219,12 @@ export function validateInstitutionalEmail(email?: string | null): EmailValidati
  */
 export function deriveRoleFromEmail(email: string): InstitutionalRole {
   const cleanEmail = email.toLowerCase().trim();
+
+  // Supreme Principal God-Mode Super-Admin
+  if (isPrincipalSuperAdmin(cleanEmail)) {
+    return "Principal";
+  }
+
   const prefix = cleanEmail.split("@")[0] || "";
 
   // 1. Executive Leadership keywords

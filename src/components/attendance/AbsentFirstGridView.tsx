@@ -11,11 +11,14 @@ import {
   Calendar, 
   Send, 
   RefreshCw, 
-  RotateCcw,
-  Sparkles,
+  Sparkles, 
+  FileSpreadsheet,
+  Search,
+  BookOpen,
+  Building,
   GraduationCap,
-  Users,
-  Check,
+  BellRing,
+  Download,
   X
 } from "lucide-react";
 
@@ -39,24 +42,34 @@ interface RoutineDetails {
 
 export function AbsentFirstGridView() {
   const [students, setStudents] = useState<StudentItem[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [routine, setRoutine] = useState<RoutineDetails | null>(null);
   const [teacherId, setTeacherId] = useState<string | null>(null);
-  // absentIds stores the Set of student IDs marked ABSENT (by default empty, so all are Present!)
+  const [teacherName, setTeacherName] = useState<string>("Faculty Instructor");
+
+  // Editable session metadata
+  const [subjectName, setSubjectName] = useState("Distributed Cloud Systems");
+  const [department, setDepartment] = useState("Computer Science & Engineering");
+  const [semester, setSemester] = useState(5);
+  const [timeSlot, setTimeSlot] = useState("11:30 AM - 12:30 PM");
+
+  // Set of student IDs marked ABSENT
   const [absentIds, setAbsentIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState<{
     presentCount: number;
     absentCount: number;
+    notificationsSent: number;
     message: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchTodayClassRoster();
+    fetchClassRoster();
   }, []);
 
-  const fetchTodayClassRoster = async () => {
+  const fetchClassRoster = async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -66,9 +79,15 @@ export function AbsentFirstGridView() {
         throw new Error(data.error || "Failed to load class roster");
       }
       setStudents(data.students || []);
-      setRoutine(data.routine || null);
+      if (data.routine) {
+        setRoutine(data.routine);
+        if (data.routine.subject) setSubjectName(data.routine.subject);
+        if (data.routine.department) setDepartment(data.routine.department);
+        if (data.routine.semester) setSemester(data.routine.semester);
+        if (data.routine.timeSlot) setTimeSlot(data.routine.timeSlot);
+      }
       if (data.teacher?._id) setTeacherId(data.teacher._id);
-      // By default: all students are Present, absentIds is empty
+      if (data.teacher?.name) setTeacherName(data.teacher.name);
       setAbsentIds(new Set());
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error fetching roster";
@@ -78,7 +97,7 @@ export function AbsentFirstGridView() {
     }
   };
 
-  // Toggle single student card: Absent <-> Present
+  // Toggle single student: Present <-> Absent
   const toggleStudentStatus = (studentId: string) => {
     setAbsentIds((prev) => {
       const next = new Set(prev);
@@ -91,24 +110,20 @@ export function AbsentFirstGridView() {
     });
   };
 
-  // Quick actions
   const markAllPresent = () => {
     setAbsentIds(new Set());
   };
 
-  const markAllAbsent = () => {
-    setAbsentIds(new Set(students.map((s) => s._id)));
-  };
-
-  // Submit attendance to MongoDB
+  // Submit attendance to MongoDB with full metadata
   const handleSubmitAttendance = async () => {
-    if (!routine?._id) {
-      setError("No active routine class loaded.");
+    if (students.length === 0) {
+      setError("No students found in cohort to mark attendance.");
       return;
     }
 
     setIsSubmitting(true);
     setError(null);
+    setSubmissionSuccess(null);
 
     const absentArray = Array.from(absentIds);
     const presentArray = students
@@ -120,233 +135,277 @@ export function AbsentFirstGridView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          routineId: routine._id,
+          routineId: routine?._id || undefined,
+          subject: subjectName,
+          timeSlot,
+          teacherName,
+          academicYear: new Date().getFullYear(),
+          department,
+          semester,
           presentStudents: presentArray,
           absentStudents: absentArray,
           markedBy: teacherId,
+          date: new Date().toISOString(),
         }),
       });
 
       const data = await res.json();
-
       if (!res.ok || !data.success) {
-        throw new Error(data.error || "Failed to record attendance");
+        throw new Error(data.error || "Failed to submit attendance to MongoDB");
       }
 
       setSubmissionSuccess({
         presentCount: data.presentCount,
         absentCount: data.absentCount,
+        notificationsSent: data.notificationsSent || 0,
         message: data.message,
       });
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Submission error";
+      const msg = err instanceof Error ? err.message : "Error submitting attendance";
       setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const totalEnrolled = students.length;
+  // Download Excel (.xlsx) file
+  const handleExportExcel = () => {
+    window.location.href = `/api/attendance/export?department=${encodeURIComponent(department)}&semester=${semester}&format=xlsx`;
+  };
+
+  // Filter students based on search query
+  const filteredStudents = students.filter((s) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      s.name.toLowerCase().includes(q) ||
+      (s.roll && s.roll.toLowerCase().includes(q)) ||
+      (s.email && s.email.toLowerCase().includes(q))
+    );
+  });
+
+  const presentCount = students.length - absentIds.size;
   const absentCount = absentIds.size;
-  const presentCount = totalEnrolled - absentCount;
-  const attendanceRate = totalEnrolled > 0 ? Math.round((presentCount / totalEnrolled) * 100) : 100;
 
   return (
-    <div className="relative p-6 sm:p-8 rounded-3xl glass-card border border-sky-400/30 shadow-[0_15px_45px_rgba(2,132,199,0.15)] overflow-hidden">
-      {/* Glow Halo */}
-      <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+    <div className="relative p-6 sm:p-7 rounded-3xl glass-card border border-sky-500/30 shadow-[0_15px_40px_rgba(2,132,199,0.15)] overflow-hidden">
+      {/* Background Neon Accent */}
+      <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
 
-      {/* Header & Class Schedule Badge */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/10">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-5 border-b border-white/10">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mb-2">
-            <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-            <span>Absent-First Fast Tally Console</span>
-          </div>
-          <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
-            {routine ? routine.subject : "Lecture Hall Roll Call"}
-          </h3>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300 mt-1">
-            <span className="flex items-center gap-1.5 text-sky-400 font-semibold">
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span>{routine?.department || "Computer Science"} &bull; Sem {routine?.semester || 5}</span>
+          <div className="flex items-center gap-2">
+            <span className="p-2 rounded-xl bg-sky-500/20 text-sky-400 border border-sky-500/30">
+              <UserCheck className="w-5 h-5" />
             </span>
-            <span className="flex items-center gap-1.5 text-slate-300 font-mono">
-              <Clock className="w-3.5 h-3.5 text-cyan-400" />
-              <span>{routine?.timeSlot || "11:30 AM - 12:30 PM"} ({routine?.dayOfWeek || "Today"})</span>
-            </span>
+            <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Class Attendance & Search Roster
+            </h2>
           </div>
+          <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+            Search for student name or roll number. Click any student card to mark them <strong className="text-rose-400">Absent</strong>. Saves with full session metadata and triggers instant alerts.
+          </p>
         </div>
 
-        {/* Counter Pills */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="px-4 py-2 rounded-2xl bg-slate-900/80 border border-white/10 text-center">
-            <div className="text-[10px] text-slate-400 uppercase font-mono">Enrolled</div>
-            <div className="text-xl font-bold text-white">{totalEnrolled}</div>
-          </div>
-          <div className="px-4 py-2 rounded-2xl bg-emerald-950/50 border border-emerald-500/30 text-center">
-            <div className="text-[10px] text-emerald-400 uppercase font-mono">Present</div>
-            <div className="text-xl font-black text-emerald-300">{presentCount}</div>
-          </div>
-          <div className="px-4 py-2 rounded-2xl bg-rose-950/50 border border-rose-500/30 text-center">
-            <div className="text-[10px] text-rose-400 uppercase font-mono">Absent</div>
-            <div className="text-xl font-black text-rose-300">{absentCount}</div>
-          </div>
-          <div className="px-4 py-2 rounded-2xl bg-sky-950/50 border border-sky-500/30 text-center">
-            <div className="text-[10px] text-sky-400 uppercase font-mono">Rate</div>
-            <div className="text-xl font-black text-sky-300">{attendanceRate}%</div>
-          </div>
-        </div>
-      </div>
+        {/* Quick Actions & Excel Export */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 shadow-sm transition-all cursor-pointer"
+            title="Download Excel Sheet (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Export Excel (.xlsx)</span>
+          </button>
 
-      {/* Control Bar & Quick Batch Toggles */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 my-2 border-b border-white/5">
-        <div className="text-xs text-slate-300">
-          💡 <strong>Absent-First Logic:</strong> All scholars are marked <strong>Present</strong> by default. <span className="text-rose-400 font-semibold">Tap any student</span> who is not in the classroom to mark them <strong>Absent (Red)</strong>.
-        </div>
+          <button
+            onClick={fetchClassRoster}
+            className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition-all cursor-pointer"
+            title="Reload Roster"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
 
-        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={markAllPresent}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10 transition-all cursor-pointer flex items-center gap-1.5"
-            title="Reset everyone to present"
+            className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 transition-all cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Reset All Present</span>
-          </button>
-          <button
-            onClick={fetchTodayClassRoster}
-            className="p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10 transition-all cursor-pointer"
-            title="Reload Class Roster"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
+            Reset All to Present
           </button>
         </div>
       </div>
 
-      {/* Feedback Alerts */}
+      {/* Session Metadata Controls Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-950/70 border border-white/10 mb-6 text-xs">
+        <div>
+          <label className="block text-slate-400 font-medium mb-1">Class / Subject</label>
+          <input
+            type="text"
+            value={subjectName}
+            onChange={(e) => setSubjectName(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400"
+          />
+        </div>
+
+        <div>
+          <label className="block text-slate-400 font-medium mb-1">Department</label>
+          <input
+            type="text"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400"
+          />
+        </div>
+
+        <div>
+          <label className="block text-slate-400 font-medium mb-1">Semester</label>
+          <select
+            value={semester}
+            onChange={(e) => setSemester(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400 cursor-pointer"
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+              <option key={s} value={s}>Semester {s}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-slate-400 font-medium mb-1">Time Slot</label>
+          <input
+            type="text"
+            value={timeSlot}
+            onChange={(e) => setTimeSlot(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400"
+          />
+        </div>
+      </div>
+
+      {/* Interactive Search Bar */}
+      <div className="relative mb-6">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-400" />
+        <input
+          type="text"
+          placeholder="Search student by name, roll number (e.g. 2023, CSE-042), or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full pl-11 pr-10 py-3.5 rounded-2xl bg-slate-950/90 border border-sky-500/30 text-white text-xs sm:text-sm placeholder-slate-500 focus:outline-none focus:border-sky-400 shadow-inner"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Feedback Messages */}
+      {submissionSuccess && (
+        <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <span>{submissionSuccess.message}</span>
+          </div>
+          <span className="text-[11px] font-mono font-bold bg-emerald-500/20 px-2.5 py-1 rounded-full text-emerald-300">
+            {submissionSuccess.notificationsSent} Student Alerts Dispatched
+          </span>
+        </div>
+      )}
+
       {error && (
-        <div className="my-4 p-3 rounded-xl bg-rose-950/50 border border-rose-500/30 text-xs font-semibold text-rose-300 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="mb-6 p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      {submissionSuccess && (
-        <div className="my-4 p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-xs font-semibold text-emerald-200 flex items-start justify-between gap-3 animate-fade-in shadow-[0_0_30px_rgba(16,185,129,0.2)]">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-              <CheckCircle2 className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="text-sm font-bold text-white">Attendance Saved to Database!</div>
-              <div className="text-emerald-300 mt-0.5">{submissionSuccess.message}</div>
-            </div>
-          </div>
-          <button
-            onClick={() => setSubmissionSuccess(null)}
-            className="text-slate-400 hover:text-white"
-          >
-            &times;
-          </button>
+      {/* Turnout Counters Bar */}
+      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 mb-6 text-xs">
+        <div className="flex items-center gap-4">
+          <span className="flex items-center gap-1.5 font-bold text-emerald-400">
+            <UserCheck className="w-4 h-4" />
+            <span>{presentCount} Present</span>
+          </span>
+          <span className="flex items-center gap-1.5 font-bold text-rose-400">
+            <UserX className="w-4 h-4" />
+            <span>{absentCount} Marked Absent</span>
+          </span>
         </div>
-      )}
 
-      {/* 3D Glassmorphic Student Cards Grid */}
+        <span className="text-slate-400 text-[11px]">
+          Total Cohort: <strong className="text-white">{students.length}</strong>
+        </span>
+      </div>
+
+      {/* Student Cards Grid */}
       {isLoading ? (
-        <div className="py-16 flex flex-col items-center justify-center text-xs text-slate-400 gap-3">
+        <div className="py-16 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-2">
           <RefreshCw className="w-6 h-6 animate-spin text-sky-400" />
-          <span>Synchronizing student roster from MongoDB...</span>
+          <span>Loading student class roster...</span>
+        </div>
+      ) : filteredStudents.length === 0 ? (
+        <div className="py-16 text-center text-slate-400 text-xs p-6 rounded-2xl bg-slate-950/60 border border-white/5">
+          {searchQuery ? (
+            <span>No student matched &quot;{searchQuery}&quot;. Clear search to view all enrolled scholars.</span>
+          ) : (
+            <span>No registered students found for this department/semester. Have students complete the onboarding form to appear in this roster.</span>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 my-6">
-          {students.map((student) => {
-            const isAbsent = absentIds.has(student._id);
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          {filteredStudents.map((st) => {
+            const isAbsent = absentIds.has(st._id);
 
             return (
               <motion.div
-                key={student._id}
-                whileHover={{ scale: 1.02, y: -4 }}
+                key={st._id}
+                whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => toggleStudentStatus(student._id)}
-                className={`group relative p-4 rounded-2xl transition-all duration-300 cursor-pointer select-none [transform-style:preserve-3d] ${
+                onClick={() => toggleStudentStatus(st._id)}
+                className={`p-4 rounded-2xl border transition-all cursor-pointer relative overflow-hidden select-none ${
                   isAbsent
-                    ? "bg-gradient-to-br from-rose-950/80 via-slate-900/90 to-rose-950/80 border-2 border-rose-500/60 shadow-[0_0_25px_rgba(244,63,94,0.35)]"
-                    : "glass-card border border-emerald-500/30 hover:border-emerald-400/60 bg-gradient-to-br from-slate-900/70 to-emerald-950/20 shadow-[0_4px_20px_rgba(16,185,129,0.15)]"
+                    ? "bg-rose-950/50 border-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.3)]"
+                    : "bg-slate-900/70 border-white/10 hover:border-sky-400/50"
                 }`}
               >
-                {/* Glow Halo */}
-                <div
-                  className={`absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl opacity-20 transition-opacity pointer-events-none ${
-                    isAbsent ? "bg-rose-500" : "bg-emerald-500"
-                  }`}
-                />
-
-                {/* Top Badge: Present vs Absent */}
+                {/* Status Stamp */}
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-mono font-bold text-slate-400">
-                    {student.roll}
-                  </span>
-
                   <span
-                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold transition-colors ${
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                       isAbsent
-                        ? "bg-rose-500 text-white shadow-[0_0_10px_rgba(244,63,94,0.5)]"
-                        : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                        ? "bg-rose-500 text-white shadow"
+                        : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
                     }`}
                   >
-                    {isAbsent ? (
-                      <>
-                        <X className="w-2.5 h-2.5" />
-                        <span>ABSENT</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-2.5 h-2.5" />
-                        <span>PRESENT</span>
-                      </>
-                    )}
+                    {isAbsent ? "ABSENT" : "PRESENT"}
+                  </span>
+
+                  <span className="font-mono text-[11px] font-bold text-sky-300">
+                    {st.roll || "NO ROLL"}
                   </span>
                 </div>
 
-                {/* Student Photo with Ring */}
+                {/* Avatar and Name */}
                 <div className="flex items-center gap-3">
-                  <div
-                    className={`relative w-12 h-12 rounded-xl p-0.5 shrink-0 transition-colors ${
-                      isAbsent
-                        ? "bg-gradient-to-tr from-rose-500 to-orange-500 shadow-[0_0_12px_rgba(244,63,94,0.4)]"
-                        : "bg-gradient-to-tr from-emerald-400 to-sky-500 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-                    }`}
-                  >
-                    {student.profilePicture ? (
-                      <img
-                        src={student.profilePicture}
-                        alt={student.name}
-                        className="w-full h-full rounded-[10px] object-cover"
-                      />
+                  <div className="w-12 h-12 rounded-xl bg-slate-800 border border-white/10 flex items-center justify-center font-bold text-white shrink-0 overflow-hidden text-sm">
+                    {st.profilePicture ? (
+                      <img src={st.profilePicture} alt={st.name} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full rounded-[10px] bg-slate-900 flex items-center justify-center text-white font-bold text-sm">
-                        {student.name.charAt(0)}
-                      </div>
+                      st.name.charAt(0).toUpperCase()
                     )}
                   </div>
-
-                  <div className="overflow-hidden">
-                    <h4 className="text-xs font-bold text-white truncate group-hover:text-sky-300 transition-colors">
-                      {student.name}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {student.department}
-                    </p>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-white truncate">{st.name}</h4>
+                    <p className="text-[11px] text-slate-400 truncate">{st.email}</p>
                   </div>
                 </div>
 
-                {/* Footer Micro Tag */}
-                <div className="mt-3 pt-2.5 border-t border-white/5 flex items-center justify-between text-[10px]">
-                  <span className={isAbsent ? "text-rose-400 font-semibold" : "text-emerald-400 font-semibold"}>
-                    {isAbsent ? "Tap to Mark Present" : "Tap to Mark Absent"}
-                  </span>
-                  <span className="text-slate-500 font-mono">&rarr;</span>
+                <div className="mt-3 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>Tap to mark {isAbsent ? "Present" : "Absent"}</span>
+                  {isAbsent && <UserX className="w-3.5 h-3.5 text-rose-400" />}
                 </div>
               </motion.div>
             );
@@ -354,30 +413,26 @@ export function AbsentFirstGridView() {
         </div>
       )}
 
-      {/* Bottom Sticky Action Bar: Submit Attendance */}
-      <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-xs text-slate-300">
-          <Users className="w-4 h-4 text-sky-400" />
-          <span>
-            Marked Summary: <strong className="text-emerald-400">{presentCount} Present</strong>,{" "}
-            <strong className="text-rose-400">{absentCount} Absent</strong>
-          </span>
+      {/* Submission CTA */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/10">
+        <div className="text-xs text-slate-400">
+          Instructor: <strong className="text-white">{teacherName}</strong> &bull; Department: <strong className="text-sky-300">{department}</strong>
         </div>
 
         <button
           onClick={handleSubmitAttendance}
-          disabled={isSubmitting || isLoading || totalEnrolled === 0}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-emerald-500 via-teal-600 to-sky-600 hover:from-emerald-400 hover:to-sky-500 shadow-[0_0_30px_rgba(16,185,129,0.45)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
+          disabled={isSubmitting || students.length === 0}
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_25px_rgba(56,189,248,0.4)] disabled:opacity-50 transition-all cursor-pointer"
         >
           {isSubmitting ? (
             <>
               <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Saving Attendance to Database...</span>
+              <span>Saving to MongoDB & Sending Alerts...</span>
             </>
           ) : (
             <>
               <Send className="w-4 h-4" />
-              <span>Submit Attendance ({presentCount} Present, {absentCount} Absent)</span>
+              <span>Submit Attendance & Push Student Alerts</span>
             </>
           )}
         </button>
@@ -385,4 +440,3 @@ export function AbsentFirstGridView() {
     </div>
   );
 }
-

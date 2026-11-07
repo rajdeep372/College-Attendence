@@ -357,21 +357,33 @@ export async function GET(req: NextRequest) {
     }
 
     // -------------------------------------------------------------
-    // 4. PRINCIPAL ANALYTICS
+    // 4. PRINCIPAL ANALYTICS (SUPREME GOD-MODE)
     // -------------------------------------------------------------
     if (role === "Principal") {
-      const [totalStudents, totalFaculty, allRoutines, allAttendance, departments] =
-        await Promise.all([
-          User.countDocuments({ role: "Student" }),
-          User.countDocuments({ role: "Teacher" }),
-          Routine.find().lean(),
-          Attendance.find()
-            .sort({ date: -1 })
-            .limit(100)
-            .populate("routineId", "department")
-            .lean(),
-          User.distinct("department"),
-        ]);
+      const [
+        totalStudentsCount, 
+        totalFacultyCount, 
+        allRoutines, 
+        allAttendance, 
+        departmentsList, 
+        allStudentsRaw,
+        allTeachersRaw,
+        allHodsRaw,
+        pendingLeavesRaw
+      ] = await Promise.all([
+        User.countDocuments({ role: "Student" }),
+        User.countDocuments({ role: "Teacher" }),
+        Routine.find().populate("teacherId", "name email").lean(),
+        Attendance.find().sort({ date: -1 }).lean(),
+        User.distinct("department"),
+        User.find({ role: "Student" }).sort({ name: 1 }).lean(),
+        User.find({ role: "Teacher" }).sort({ name: 1 }).lean(),
+        User.find({ role: "HOD" }).sort({ name: 1 }).lean(),
+        Leave.find({ status: "Pending" })
+          .sort({ createdAt: -1 })
+          .populate("applicantId", "name email rollNumber department role profilePicture")
+          .lean(),
+      ]);
 
       // Calculate campus overall attendance
       let overallPresents = 0;
@@ -385,7 +397,7 @@ export async function GET(req: NextRequest) {
         overallPresents += presents;
         overallTotal += total;
 
-        const dept = (att.routineId as any)?.department || "General Sciences";
+        const dept = att.department || "General Academic & Sciences";
         if (!deptAttendanceMap[dept]) {
           deptAttendanceMap[dept] = { present: 0, total: 0 };
         }
@@ -394,31 +406,83 @@ export async function GET(req: NextRequest) {
       }
 
       const campusPercentage =
-        overallTotal > 0 ? ((overallPresents / overallTotal) * 100).toFixed(1) + "%" : "95.2%";
+        overallTotal > 0 ? ((overallPresents / overallTotal) * 100).toFixed(1) + "%" : "0.0%";
 
-      // Department breakdown ranks
+      // Compute student-by-student attendance rates
+      const studentMap = allStudentsRaw.map((st) => {
+        let attended = 0;
+        let total = 0;
+        for (const att of allAttendance) {
+          const isPres = att.presentStudents.some((id: any) => id.toString() === st._id.toString());
+          const isAbs = att.absentStudents.some((id: any) => id.toString() === st._id.toString());
+          if (isPres || isAbs) {
+            total++;
+            if (isPres) attended++;
+          }
+        }
+        const pct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 100.0;
+        return {
+          _id: st._id.toString(),
+          name: st.name,
+          email: st.email,
+          rollNumber: st.rollNumber || "N/A",
+          department: st.department || "General",
+          semester: st.semester || 1,
+          section: st.section || "A",
+          profilePicture: st.profilePicture || "",
+          idCardSoftCopy: st.idCardSoftCopy || "",
+          attendancePercentage: pct,
+          totalClasses: total,
+          attendedClasses: attended,
+        };
+      });
+
+      // Map distinct departments
       const standardDepts = [
         "Computer Science & Engineering",
-        "Electronics & Communication",
+        "Artificial Intelligence & Machine Learning (AIML)",
+        "Information Technology",
+        "Electronics & Communication Engineering",
+        "Electrical & Electronics Engineering",
         "Mechanical Engineering",
         "Civil Engineering",
-        "Electrical Engineering",
-        "Information Technology",
+        "Bachelor of Computer Applications (BCA)",
+        "Master of Computer Applications (MCA)",
+        "Data Science & Analytics",
       ];
 
-      const activeDeptNames = Array.from(new Set([...departments, ...Object.keys(deptAttendanceMap)]));
-      const rankedDepts = (activeDeptNames.length > 0 ? activeDeptNames : standardDepts).map((dept) => {
-        const stats = deptAttendanceMap[dept];
-        const pct =
-          stats && stats.total > 0
-            ? ((stats.present / stats.total) * 100).toFixed(1) + "%"
-            : (92 + Math.floor(Math.random() * 6)).toFixed(1) + "%";
+      const activeDeptNames = Array.from(new Set([...departmentsList, ...Object.keys(deptAttendanceMap), ...standardDepts]));
+
+      // Build structured Department Overview (HOD, Teachers list, Routines count)
+      const departmentsOverview = activeDeptNames.map((deptName) => {
+        const hod = allHodsRaw.find((h) => h.department === deptName) || null;
+        const teachersInDept = allTeachersRaw.filter((t) => t.department === deptName);
+        const deptRoutines = allRoutines.filter((r) => r.department === deptName);
+        const deptStudents = studentMap.filter((s) => s.department === deptName);
+        const stats = deptAttendanceMap[deptName];
+        const pct = stats && stats.total > 0 ? ((stats.present / stats.total) * 100).toFixed(1) + "%" : "0.0%";
 
         return {
-          name: dept,
-          attendance: pct,
-          students: totalStudents > 0 ? Math.round(totalStudents / Math.max(1, activeDeptNames.length)) : 120,
-          hod: `Head of ${dept.split(" ")[0]}`,
+          name: deptName,
+          hod: hod ? {
+            _id: hod._id.toString(),
+            name: hod.name,
+            email: hod.email,
+            phone: hod.phone || "",
+            designation: hod.designation || "Head of Department",
+            profilePicture: hod.profilePicture || "",
+          } : null,
+          teachers: teachersInDept.map((t) => ({
+            _id: t._id.toString(),
+            name: t.name,
+            email: t.email,
+            designation: t.designation || "Faculty",
+            profilePicture: t.profilePicture || "",
+            routinesCount: deptRoutines.filter((r) => r.teacherId?._id?.toString() === t._id.toString()).length,
+          })),
+          studentCount: deptStudents.length,
+          routinesCount: deptRoutines.length,
+          attendanceRate: pct,
         };
       });
 
@@ -426,14 +490,14 @@ export async function GET(req: NextRequest) {
         {
           label: "Campus Overall Attendance",
           value: campusPercentage,
-          change: "+2.1% from last month",
+          change: "Real-time Biometric Ledger",
           trend: "up",
           glow: "rgba(56, 189, 248, 0.3)",
           color: "from-sky-500 to-blue-600",
         },
         {
           label: "Faculty Registered",
-          value: `${totalFaculty > 0 ? totalFaculty : 144} Members`,
+          value: `${totalFacultyCount} Members`,
           change: "Campus-Wide Active Faculty",
           trend: "neutral",
           glow: "rgba(168, 85, 247, 0.3)",
@@ -441,16 +505,16 @@ export async function GET(req: NextRequest) {
         },
         {
           label: "Active Departments",
-          value: `${Math.max(activeDeptNames.length, 1)} Units`,
-          change: "100% Institutional Compliance",
+          value: `${activeDeptNames.length} Units`,
+          change: "Institutional Compliance",
           trend: "up",
           glow: "rgba(16, 185, 129, 0.3)",
           color: "from-emerald-500 to-teal-600",
         },
         {
           label: "Total Enrolled Scholars",
-          value: `${totalStudents > 0 ? totalStudents : 1250} Students`,
-          change: "Real-Time Biometric Ledger",
+          value: `${totalStudentsCount} Students`,
+          change: "Database Registered Cohort",
           trend: "up",
           glow: "rgba(245, 158, 11, 0.3)",
           color: "from-amber-500 to-orange-600",
@@ -462,10 +526,13 @@ export async function GET(req: NextRequest) {
         role: "Principal",
         analytics: {
           stats,
-          departmentRanks: rankedDepts.slice(0, 6),
-          totalStudents,
-          totalFaculty,
+          departmentsOverview,
+          allStudents: studentMap,
+          allPendingLeaves: pendingLeavesRaw,
+          totalStudents: totalStudentsCount,
+          totalFaculty: totalFacultyCount,
           totalRoutines: allRoutines.length,
+          activeDepartments: activeDeptNames,
         },
       });
     }

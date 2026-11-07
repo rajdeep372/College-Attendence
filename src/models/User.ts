@@ -15,6 +15,14 @@ export interface IUser extends Document {
   designation?: string;
   onboarded: boolean;
   profilePicture?: string;
+  idCardSoftCopy?: string;
+  sessionYear?: string;
+  archivedSessions?: Array<{
+    semester: number;
+    sessionYear: string;
+    attendancePercentage: number;
+    archivedAt: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,6 +100,25 @@ const UserSchema = new Schema<IUser>(
       type: String,
       default: "",
     },
+    idCardSoftCopy: {
+      type: String,
+      default: "",
+    },
+    sessionYear: {
+      type: String,
+      default: "2024-2025",
+    },
+    archivedSessions: [
+      {
+        semester: Number,
+        sessionYear: String,
+        attendancePercentage: Number,
+        archivedAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
   },
   {
     timestamps: true,

@@ -5,7 +5,8 @@ import { currentUser } from "@clerk/nextjs/server";
 import { 
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
-  getRoleDashboardPath 
+  getRoleDashboardPath,
+  isPrincipalSuperAdmin 
 } from "@/lib/auth-rbac";
 
 export async function GET() {
@@ -18,6 +19,7 @@ export async function GET() {
     }
 
     const email = clerkUser.emailAddresses?.[0]?.emailAddress || "";
+    const isGodMode = isPrincipalSuperAdmin(email);
     const validation = validateInstitutionalEmail(email);
 
     let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
@@ -26,8 +28,9 @@ export async function GET() {
       success: true,
       email,
       validation,
-      onboarded: Boolean(dbUser?.onboarded),
+      onboarded: isGodMode || Boolean(dbUser?.onboarded),
       user: dbUser,
+      targetDashboard: isGodMode ? "/dashboard/principal" : undefined,
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error querying onboarding state";

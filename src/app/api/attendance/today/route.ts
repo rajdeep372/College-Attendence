@@ -91,67 +91,25 @@ export async function GET(req: NextRequest) {
         .lean<PlainRoutine | null>();
     }
 
-    // If still no routine exists, create a default class routine
-    if (!routine) {
-      const createdRoutine = await Routine.create({
-        department: "Computer Science",
-        semester: 5,
-        dayOfWeek: activeDay,
-        subject: "CS-504 Database Management Systems",
-        timeSlot: "11:30 AM - 12:30 PM",
-        teacherId: teacher._id,
-      });
-
-      const populated = await Routine.findById(createdRoutine._id)
-        .populate("teacherId", "name email department")
-        .lean<PlainRoutine | null>();
-
-      routine = populated;
-    }
-
+    // If no routine exists, return null routine so teacher can specify their class
     const targetDepartment = routine?.department || teacher?.department || "General Academic & Sciences";
 
     // 4. Fetch all Students for this department & semester
     const studentFilter: Record<string, unknown> = {
       role: "Student",
-      department: targetDepartment,
     };
+    if (targetDepartment) {
+      studentFilter.department = targetDepartment;
+    }
+    if (routine?.semester) {
+      studentFilter.semester = routine.semester;
+    }
 
     let students = await User.find(studentFilter).lean<IUser[]>();
 
-    // If student cohort is too small, provision a sample batch of 10 students with roll numbers & photos
-    if (!students || students.length < 8) {
-      const sampleCohort = [
-        { name: "Aarav Patel", email: "aarav.patel@college.edu", photo: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80" },
-        { name: "Sneha Rao", email: "sneha.rao@college.edu", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80" },
-        { name: "Vikram Malhotra", email: "vikram.malhotra@college.edu", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80" },
-        { name: "Ananya Sen", email: "ananya.sen@college.edu", photo: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80" },
-        { name: "Rohan Verma", email: "rohan.verma@college.edu", photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80" },
-        { name: "Pooja Hegde", email: "pooja.hegde@college.edu", photo: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80" },
-        { name: "Aditya Roy", email: "aditya.roy@college.edu", photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80" },
-        { name: "Kavya Menon", email: "kavya.menon@college.edu", photo: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80" },
-        { name: "Devansh Dixit", email: "devansh.dixit@college.edu", photo: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80" },
-        { name: "Meera Nair", email: "meera.nair@college.edu", photo: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80" },
-      ];
-
-      for (let i = 0; i < sampleCohort.length; i++) {
-        const item = sampleCohort[i];
-        await User.findOneAndUpdate(
-          { email: item.email },
-          {
-            clerkId: `student_cohort_${i + 1}`,
-            name: item.name,
-            email: item.email,
-            phone: `+91 98765 432${i}0`,
-            role: "Student",
-            department: targetDepartment,
-            profilePicture: item.photo,
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-      }
-
-      students = await User.find(studentFilter).lean<IUser[]>();
+    // If no students in this exact department, fetch all registered students
+    if (!students || students.length === 0) {
+      students = await User.find({ role: "Student" }).lean<IUser[]>();
     }
 
     // Format students with roll numbers
@@ -172,14 +130,14 @@ export async function GET(req: NextRequest) {
         name: teacher.name,
         email: teacher.email,
       },
-      routine: {
-        _id: routine?._id ? routine._id.toString() : "",
-        subject: routine?.subject || "CS-504 Database Management Systems",
+      routine: routine ? {
+        _id: routine._id ? routine._id.toString() : "",
+        subject: routine.subject,
         department: targetDepartment,
-        semester: routine?.semester || 5,
-        timeSlot: routine?.timeSlot || "11:30 AM - 12:30 PM",
-        dayOfWeek: routine?.dayOfWeek || activeDay,
-      },
+        semester: routine.semester,
+        timeSlot: routine.timeSlot,
+        dayOfWeek: routine.dayOfWeek || activeDay,
+      } : null,
       studentCount: formattedStudents.length,
       students: formattedStudents,
     });

@@ -2,7 +2,13 @@ import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
 export interface IAttendance extends Document {
   date: Date;
-  routineId: Types.ObjectId;
+  timeSlot?: string;
+  teacherName: string;
+  subject: string;
+  academicYear?: string | number;
+  department: string;
+  semester: number;
+  routineId?: Types.ObjectId;
   presentStudents: Types.ObjectId[];
   absentStudents: Types.ObjectId[];
   markedBy: Types.ObjectId;
@@ -18,10 +24,44 @@ const AttendanceSchema = new Schema<IAttendance>(
       default: Date.now,
       index: true,
     },
+    timeSlot: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    teacherName: {
+      type: String,
+      required: [true, "Teacher name is required"],
+      trim: true,
+      default: "Faculty Member",
+    },
+    subject: {
+      type: String,
+      required: [true, "Class / Subject is required"],
+      trim: true,
+    },
+    academicYear: {
+      type: Schema.Types.Mixed,
+      default: new Date().getFullYear(),
+    },
+    department: {
+      type: String,
+      required: [true, "Department is required"],
+      trim: true,
+      index: true,
+    },
+    semester: {
+      type: Number,
+      required: [true, "Semester is required"],
+      min: 1,
+      max: 12,
+      default: 1,
+      index: true,
+    },
     routineId: {
       type: Schema.Types.ObjectId,
       ref: "Routine",
-      required: [true, "Routine reference is required"],
+      required: false,
       index: true,
     },
     presentStudents: [
@@ -50,13 +90,11 @@ const AttendanceSchema = new Schema<IAttendance>(
   }
 );
 
-// Compound index for querying attendance by date and routine
-AttendanceSchema.index({ routineId: 1, date: 1 });
+// Compound index for querying attendance by department, semester, and date
+AttendanceSchema.index({ department: 1, semester: 1, date: -1 });
 
-// Prevent model overwrite error during Next.js App Router hot reloads
 const Attendance: Model<IAttendance> =
   (mongoose.models && mongoose.models.Attendance) ||
   mongoose.model<IAttendance>("Attendance", AttendanceSchema);
 
 export default Attendance;
-

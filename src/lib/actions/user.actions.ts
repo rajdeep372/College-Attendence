@@ -7,7 +7,8 @@ import {
   validateInstitutionalEmail, 
   deriveRoleFromEmail,
   deriveDepartment,
-  deriveRollNumber
+  deriveRollNumber,
+  isPrincipalSuperAdmin
 } from "@/lib/auth-rbac";
 
 export interface SerializedUser {
@@ -24,6 +25,14 @@ export interface SerializedUser {
   designation?: string;
   onboarded?: boolean;
   profilePicture: string;
+  idCardSoftCopy?: string;
+  sessionYear?: string;
+  archivedSessions?: Array<{
+    semester: number;
+    sessionYear: string;
+    attendancePercentage: number;
+    archivedAt: string;
+  }>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -70,15 +79,19 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
     // Query user by clerkId
     let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean<IUser>();
 
+    const isGodMode = isPrincipalSuperAdmin(primaryEmail);
+
     // If user not in MongoDB yet, auto-provision with derived credentials
     if (!dbUser) {
       const newUser = await User.create({
         clerkId: clerkUser.id,
-        name: fullName,
+        name: isGodMode ? `${fullName} (Principal)` : fullName,
         email: primaryEmail.toLowerCase().trim(),
-        role: derivedRole,
-        department: dynamicDepartment,
-        rollNumber: dynamicRoll,
+        role: isGodMode ? "Principal" : derivedRole,
+        department: isGodMode ? "Executive Institutional Leadership" : dynamicDepartment,
+        rollNumber: isGodMode ? "ADM-PRIN-SUPERADMIN" : dynamicRoll,
+        designation: isGodMode ? "Supreme Principal Super-Admin" : "",
+        onboarded: isGodMode ? true : false,
         profilePicture: clerkUser.imageUrl || "",
       });
 
@@ -88,6 +101,14 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       let needsUpdate = false;
       const updatePayload: Record<string, unknown> = {};
 
+      if (isGodMode && (dbUser.role !== "Principal" || !dbUser.onboarded)) {
+        updatePayload.role = "Principal";
+        updatePayload.department = "Executive Institutional Leadership";
+        updatePayload.designation = "Supreme Principal Super-Admin";
+        updatePayload.onboarded = true;
+        needsUpdate = true;
+      }
+
       if (!dbUser.rollNumber) {
         updatePayload.rollNumber = dynamicRoll;
         needsUpdate = true;
@@ -96,7 +117,7 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
         updatePayload.department = metaDept;
         needsUpdate = true;
       }
-      if (dbUser.role !== derivedRole && derivedRole !== "Student") {
+      if (!isGodMode && dbUser.role !== derivedRole && derivedRole !== "Student") {
         updatePayload.role = derivedRole;
         needsUpdate = true;
       }
@@ -123,6 +144,14 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       designation: dbUser.designation || "",
       onboarded: Boolean(dbUser.onboarded),
       profilePicture: dbUser.profilePicture || clerkUser.imageUrl || "",
+      idCardSoftCopy: dbUser.idCardSoftCopy || "",
+      sessionYear: dbUser.sessionYear || "2024-2025",
+      archivedSessions: dbUser.archivedSessions?.map((s) => ({
+        semester: s.semester,
+        sessionYear: s.sessionYear,
+        attendancePercentage: s.attendancePercentage,
+        archivedAt: s.archivedAt instanceof Date ? s.archivedAt.toISOString() : String(s.archivedAt),
+      })) || [],
       createdAt: dbUser.createdAt ? dbUser.createdAt.toISOString() : undefined,
       updatedAt: dbUser.updatedAt ? dbUser.updatedAt.toISOString() : undefined,
     };

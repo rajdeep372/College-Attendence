@@ -15,7 +15,8 @@ import { InstallPwaPrompt } from "@/components/pwa/InstallPwaPrompt";
 import { 
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
-  getRoleDashboardPath 
+  getRoleDashboardPath,
+  isPrincipalSuperAdmin 
 } from "@/lib/auth-rbac";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 
@@ -30,6 +31,12 @@ export default async function HomePage() {
   // If already logged in, validate institutional email & auto-route immediately
   if (clerkUser) {
     const primaryEmail = clerkUser.emailAddresses?.[0]?.emailAddress || "";
+
+    // Supreme Principal God-Mode Super-Admin
+    if (isPrincipalSuperAdmin(primaryEmail)) {
+      redirect("/dashboard/principal");
+    }
+
     const validation = validateInstitutionalEmail(primaryEmail);
 
     if (!validation.valid) {
