@@ -485,7 +485,7 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
         {/* ============================================================== */}
         {/* 2. ALL DEPARTMENTS DIRECTORY (HOD + TEACHERS UNDER EACH)       */}
         {/* ============================================================== */}
-        <section className="space-y-6">
+        <section id="departments" className="space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
@@ -652,7 +652,7 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
         {/* ============================================================== */}
         {/* 3. CAMPUS-WIDE STUDENT BIOMETRIC LEDGER & ID DIRECTORY          */}
         {/* ============================================================== */}
-        <section className="p-6 sm:p-8 rounded-3xl glass-card border border-white/10 space-y-6">
+        <section id="reports" className="p-6 sm:p-8 rounded-3xl glass-card border border-white/10 space-y-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">

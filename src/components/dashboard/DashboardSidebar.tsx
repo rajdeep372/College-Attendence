@@ -26,12 +26,10 @@ import {
   Shield,
   Clock,
   Sparkles,
-  LogOut,
   MapPin
 } from "lucide-react";
 import { UserButton, useUser } from "@clerk/nextjs";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { InstallPwaPrompt } from "@/components/pwa/InstallPwaPrompt";
 
 export interface NavItem {
   title: string;
@@ -94,11 +92,12 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
 
   return (
     <>
-      {/* Mobile Sidebar Toggle Floating Button */}
-      <div className="lg:hidden fixed bottom-5 left-5 z-50">
+      {/* Mobile Floating Quick Pill (z-50) */}
+      <div className="lg:hidden fixed bottom-5 left-5 z-50 pointer-events-auto">
         <button
+          type="button"
           onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="p-3.5 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-[0_0_25px_rgba(56,189,248,0.5)] border border-white/20 backdrop-blur-md cursor-pointer flex items-center gap-2"
+          className="p-3.5 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white shadow-[0_0_25px_rgba(56,189,248,0.5)] border border-white/20 backdrop-blur-md cursor-pointer flex items-center gap-2 pointer-events-auto active:scale-95 transition-transform"
           aria-label="Toggle mobile navigation"
         >
           {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -106,26 +105,27 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
         </button>
       </div>
 
-      {/* Mobile Drawer Backdrop */}
+      {/* Mobile Drawer Backdrop (z-50) */}
       <AnimatePresence>
         {isMobileOpen && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             onClick={() => setIsMobileOpen(false)}
-            className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-md"
+            className="lg:hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-md cursor-pointer pointer-events-auto"
           />
         )}
       </AnimatePresence>
 
       {/* Main Glassmorphic Sidebar (Desktop + Mobile Slide-over) */}
       <aside
-        className={`fixed lg:sticky top-0 left-0 z-40 h-screen transition-all duration-300 ease-in-out flex flex-col justify-between
+        className={`fixed lg:sticky top-0 left-0 h-screen transition-all duration-300 ease-in-out flex flex-col justify-between
           ${isCollapsed ? "lg:w-20" : "lg:w-72"}
           w-72 max-w-[85vw]
-          ${isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-          bg-slate-950/80 backdrop-blur-2xl border-r border-sky-500/20 shadow-[10px_0_35px_rgba(0,0,0,0.5)]
+          ${isMobileOpen ? "translate-x-0 z-[60]" : "-translate-x-full lg:translate-x-0 z-40"}
+          bg-slate-950/90 backdrop-blur-2xl border-r border-sky-500/20 shadow-[10px_0_35px_rgba(0,0,0,0.5)] pointer-events-auto
         `}
       >
         {/* Top Header / Brand Logo */}
@@ -133,7 +133,8 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
           <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between">
             <Link
               href="/"
-              className="flex items-center gap-3 overflow-hidden group"
+              onClick={() => setIsMobileOpen(false)}
+              className="flex items-center gap-3 overflow-hidden group cursor-pointer pointer-events-auto"
             >
               <div
                 className={`w-10 h-10 rounded-2xl bg-gradient-to-tr ${roleGradients[role]} flex items-center justify-center text-white shrink-0 shadow-[0_0_20px_rgba(56,189,248,0.4)] border border-white/20 group-hover:scale-105 transition-transform`}
@@ -155,11 +156,21 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
 
             {/* Desktop Collapse Toggle Button */}
             <button
+              type="button"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hidden lg:flex p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/10 transition-colors cursor-pointer"
+              className="hidden lg:flex p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/10 transition-colors cursor-pointer pointer-events-auto"
               title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             >
               {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
+
+            {/* Mobile Close Button */}
+            <button
+              type="button"
+              onClick={() => setIsMobileOpen(false)}
+              className="lg:hidden p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer pointer-events-auto"
+            >
+              <X className="w-4 h-4" />
             </button>
           </div>
 
@@ -192,7 +203,7 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
                   key={index}
                   href={item.href}
                   onClick={() => setIsMobileOpen(false)}
-                  className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer pointer-events-auto ${
                     isActive
                       ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.35)]"
                       : "text-slate-300 hover:text-white hover:bg-slate-900/70 border border-transparent hover:border-white/5"
@@ -287,4 +298,3 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
     </>
   );
 }
-

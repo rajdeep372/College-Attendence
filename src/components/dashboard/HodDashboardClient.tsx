@@ -233,7 +233,7 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
 
         {/* Pending Approvals & Syllabus Progress */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 p-6 rounded-3xl glass-card border border-white/10">
+          <div id="leaves" className="lg:col-span-2 p-6 rounded-3xl glass-card border border-white/10">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-bold text-white">Pending Leave Authorizations</h3>

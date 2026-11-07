@@ -407,8 +407,9 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
 
           {/* Digital Holographic Campus ID Card */}
           <div
+            id="id-card"
             onClick={() => setIsIdModalOpen(true)}
-            className="p-6 rounded-3xl glass-card border border-white/15 bg-gradient-to-br from-slate-900/90 to-sky-950/80 shadow-[0_0_30px_rgba(56,189,248,0.15)] flex flex-col justify-between cursor-pointer hover:border-sky-400/50 transition-all group"
+            className="p-6 rounded-3xl glass-card border border-white/15 bg-gradient-to-br from-slate-900/90 to-sky-950/80 shadow-[0_0_30px_rgba(56,189,248,0.15)] flex flex-col justify-between cursor-pointer hover:border-sky-400/50 transition-all group pointer-events-auto"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -469,7 +470,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           </div>
 
           {/* Safe Margin Calculator & Session Info */}
-          <div className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
+          <div id="calculator" className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <TrendingUp className="w-5 h-5 text-sky-400" />
@@ -503,7 +504,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
         </div>
 
         {/* Live Subject-Wise Ledger */}
-        <div className="p-6 rounded-3xl glass-card border border-white/10">
+        <div id="subjects" className="p-6 rounded-3xl glass-card border border-white/10">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h3 className="text-lg font-bold text-white mb-1">Subject-Wise Attendance Ledger</h3>
@@ -612,7 +613,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           </div>
 
           {/* Registered Leaves Status */}
-          <div className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
+          <div id="leave" className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">

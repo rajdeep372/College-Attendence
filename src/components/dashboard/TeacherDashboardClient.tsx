@@ -212,7 +212,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
 
         {/* Grid: Schedule & Defaulter Warnings */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 p-6 rounded-3xl glass-card border border-white/10">
+          <div id="schedule" className="lg:col-span-2 p-6 rounded-3xl glass-card border border-white/10">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-bold text-white">Today&apos;s Lecture Schedule</h3>
@@ -269,7 +269,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
           </div>
 
           {/* Defaulter Alerts */}
-          <div className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
+          <div id="defaulters" className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <AlertCircle className="w-5 h-5 text-rose-400" />

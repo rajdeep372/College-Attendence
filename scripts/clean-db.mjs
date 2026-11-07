@@ -36,3 +36,4 @@ async function cleanDatabase() {
 }
 
 cleanDatabase().catch(console.error);
+
