@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const finalSemesterPct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 100.0;
+      const finalSemesterPct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 0.0;
 
       // Archive current session
       const archiveEntry = {

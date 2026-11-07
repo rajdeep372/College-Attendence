@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Real calculation from database attendance logs
-      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 100.0;
+      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 0.0;
       const effectiveConsecutive = consecutiveAbsences;
 
       const riskReasons: string[] = [];
@@ -203,7 +203,7 @@ export async function GET() {
         }
       }
 
-      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 100.0;
+      const percentage = total > 0 ? Math.round((attended / total) * 1000) / 10 : 0.0;
       const effectiveConsecutive = consecutiveAbsences;
 
       const riskReasons: string[] = [];

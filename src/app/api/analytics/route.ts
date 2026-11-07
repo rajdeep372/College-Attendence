@@ -72,15 +72,16 @@ export async function GET(req: NextRequest) {
           .lean();
       }
 
-      // Aggregate totals and subject breakdown
+      // Aggregate totals and subject breakdown directly from real MongoDB attendance records
       const subjectMap: Record<string, { code: string; name: string; attended: number; total: number }> = {};
       let totalAttended = 0;
       let totalConducted = 0;
 
       for (const rec of attendanceRecords) {
-        const routine = rec.routineId;
-        const subjName = routine?.subject || "Core Lecture";
-        const subjCode = subjName.split(" ")[0] || "ACAD";
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const routine = rec.routineId as any;
+        const subjName = rec.subject || routine?.subject || "Core Lecture";
+        const subjCode = routine?.paperCode || (subjName.includes(" ") ? subjName.split(" ")[0] : "ACAD");
 
         if (!subjectMap[subjName]) {
           subjectMap[subjName] = {
@@ -92,6 +93,7 @@ export async function GET(req: NextRequest) {
         }
 
         const isPresent = (rec.presentStudents || []).some(
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (id: any) => id.toString() === targetStudentId?.toString()
         );
 
@@ -104,63 +106,72 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // If user is brand new with zero attendance, provide fallback populated from Routine
+      // Also incorporate scheduled subjects from Routine for this student's department, semester, section
+      // so the student can see their enrolled curriculum even before attendance has been taken
+      const studentDept = department || targetStudentDoc?.department || "Computer Science & Engineering";
+      const studentSem = targetStudentDoc?.semester || 1;
+      const studentSec = targetStudentDoc?.section || "Section A";
+
+      const scheduledRoutines = await Routine.find({
+        department: studentDept,
+        semester: studentSem,
+        section: studentSec,
+      }).lean();
+
+      for (const r of scheduledRoutines) {
+        if (!subjectMap[r.subject]) {
+          subjectMap[r.subject] = {
+            code: (r as any).paperCode || (r.subject.includes(" ") ? r.subject.split(" ")[0] : "SUBJ"),
+            name: r.subject,
+            attended: 0,
+            total: 0,
+          };
+        }
+      }
+
+      // Compute strictly mathematical subject percentage
       const subjectsList = Object.values(subjectMap).map((sub) => {
-        const pct = sub.total > 0 ? (sub.attended / sub.total) * 100 : 100;
+        const pct = sub.total > 0 ? parseFloat(((sub.attended / sub.total) * 100).toFixed(1)) : 0.0;
+        let status = "pending";
+        if (sub.total > 0) {
+          if (pct >= 85) status = "safe";
+          else if (pct >= 75) status = "warning";
+          else status = "critical";
+        }
         return {
           code: sub.code,
           name: sub.name,
           attended: sub.attended,
           total: sub.total,
-          percent: parseFloat(pct.toFixed(1)),
-          status: pct >= 85 ? "safe" : pct >= 75 ? "warning" : "critical",
+          percent: pct,
+          status,
         };
       });
 
-      // If empty records, populate from the student's department routines
-      if (subjectsList.length === 0) {
-        const studentDept = department || targetStudentDoc?.department || "Computer Science & Engineering";
-        const studentSem = targetStudentDoc?.semester || 1;
-        const studentSec = targetStudentDoc?.section || "Section A";
-        let routines = await Routine.find({ department: studentDept, semester: studentSem, section: studentSec }).limit(4).lean();
-        if (routines.length === 0) {
-          routines = await Routine.find({ department: studentDept }).limit(4).lean();
-        }
-        
-        if (routines.length > 0) {
-          routines.forEach((r) => {
-            subjectsList.push({
-              code: r.subject.split(" ")[0] || "CR-101",
-              name: r.subject,
-              attended: 0,
-              total: 0,
-              percent: 100.0,
-              status: "safe",
-            });
-          });
-        } else {
-          subjectsList.push({
-            code: "CS-501",
-            name: "Core Departmental Curriculum",
-            attended: 0,
-            total: 0,
-            percent: 100.0,
-            status: "safe",
-          });
-        }
-      }
-
+      // Strict Mathematical Overall Turnout
+      // Current Turnout = (totalAttended / totalConducted) * 100
+      // If totalConducted === 0, strictly 0.0% (No classes conducted)
       const overallPercentage =
         totalConducted > 0
           ? parseFloat(((totalAttended / totalConducted) * 100).toFixed(1))
-          : 100.0;
+          : 0.0;
 
-      // Safe Bunk Margin: max allowed absences while remaining >= 75%
-      // (attended) / (total + x) >= 0.75 => x <= (attended / 0.75) - total
+      // Real College Permissible Bunks Threshold (75% institutional requirement)
+      // If 0 classes conducted: cannot bunk future classes, permissible = 0
+      // If currently >= 75%: floor(totalAttended / 0.75 - totalConducted)
+      // If currently < 75%: 0 permissible bunks
       const allowedAbsences =
-        totalConducted > 0
+        totalConducted > 0 && overallPercentage >= 75
           ? Math.max(0, Math.floor(totalAttended / 0.75 - totalConducted))
-          : 5;
+          : 0;
+
+      // Classes needed to recover to 75% threshold
+      const classesNeededToRecover =
+        totalConducted > 0 && overallPercentage < 75
+          ? Math.max(0, Math.ceil(3 * totalConducted - 4 * totalAttended))
+          : 0;
+
+      const isEligible = totalConducted > 0 && overallPercentage >= 75;
 
       // Fetch active campus circulars for students
       const circulars = await Circular.find({
@@ -183,10 +194,6 @@ export async function GET(req: NextRequest) {
       const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const rawDay = daysOfWeek[new Date().getDay()] || "Monday";
       const activeDay = rawDay === "Sunday" ? "Monday" : rawDay;
-
-      const studentDept = department || targetStudentDoc?.department || "Computer Science & Engineering";
-      const studentSem = targetStudentDoc?.semester || 1;
-      const studentSec = targetStudentDoc?.section || "Section A";
 
       const routinesToday = await Routine.find({
         department: studentDept,
@@ -225,8 +232,9 @@ export async function GET(req: NextRequest) {
           totalAttended,
           totalConducted,
           overallPercentage,
-          isEligible: overallPercentage >= 75,
+          isEligible,
           allowedAbsences,
+          classesNeededToRecover,
           subjects: subjectsList,
           recentCirculars: circulars,
           leaves: studentLeaves,
@@ -283,22 +291,38 @@ export async function GET(req: NextRequest) {
       const defaulterMap: Record<string, { name: string; roll: string; email: string; absences: number; percentage: string }> = {};
 
       for (const log of attendanceLogs) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const absents = (log.absentStudents || []) as any[];
         for (const st of absents) {
           const id = st._id?.toString() || st.name;
           if (!defaulterMap[id]) {
             defaulterMap[id] = {
               name: st.name || "Student",
-              roll: st.rollNumber || "2023-CS-000",
+              roll: st.rollNumber || (st.email ? st.email.split("@")[0].toUpperCase() : "NO-ROLL"),
               email: st.email || "",
               absences: 1,
-              percentage: "68.5%",
+              percentage: "0.0%",
             };
           } else {
             defaulterMap[id].absences += 1;
-            const approxPct = Math.max(50, 75 - defaulterMap[id].absences * 3);
-            defaulterMap[id].percentage = `${approxPct}%`;
           }
+        }
+      }
+
+      // Calculate real mathematical attendance percentage for each defaulter from MongoDB
+      for (const id of Object.keys(defaulterMap)) {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          const stObjId = new mongoose.Types.ObjectId(id);
+          const studentLogs = await Attendance.find({
+            $or: [{ presentStudents: stObjId }, { absentStudents: stObjId }],
+          }).lean();
+
+          let attended = 0;
+          for (const l of studentLogs) {
+            if (l.presentStudents.some((pId) => pId.toString() === id)) attended++;
+          }
+          const realPct = studentLogs.length > 0 ? ((attended / studentLogs.length) * 100).toFixed(1) + "%" : "0.0%";
+          defaulterMap[id].percentage = realPct;
         }
       }
 
@@ -368,7 +392,7 @@ export async function GET(req: NextRequest) {
       }
 
       const branchAttendanceRate =
-        deptTotal > 0 ? ((deptPresent / deptTotal) * 100).toFixed(1) + "%" : "96.4%";
+        deptTotal > 0 ? ((deptPresent / deptTotal) * 100).toFixed(1) + "%" : "0.0%";
 
       const stats = [
         {
@@ -379,13 +403,13 @@ export async function GET(req: NextRequest) {
         },
         {
           label: "Active Faculty Today",
-          value: `${totalFaculty > 0 ? totalFaculty : 24} / ${totalFaculty > 0 ? totalFaculty : 25}`,
+          value: `${totalFaculty} Faculty`,
           sub: "Department Registered Faculty",
           color: "from-cyan-500 to-blue-600",
         },
         {
           label: "Classes Scheduled",
-          value: `${departmentRoutines.length > 0 ? departmentRoutines.length : 38} Sessions`,
+          value: `${departmentRoutines.length} Sessions`,
           sub: "Active Timetable Modules",
           color: "from-emerald-500 to-teal-600",
         },
@@ -475,7 +499,7 @@ export async function GET(req: NextRequest) {
             if (isPres) attended++;
           }
         }
-        const pct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 100.0;
+        const pct = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 0.0;
         return {
           _id: st._id.toString(),
           name: st.name,

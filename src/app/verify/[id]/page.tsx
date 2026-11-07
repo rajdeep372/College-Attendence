@@ -82,8 +82,8 @@ export default async function VerifyStudentPage({ params }: VerifyPageProps) {
     if (isPres) attended++;
   }
 
-  const attendancePercentage = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 100.0;
-  const isEligible = attendancePercentage >= 75.0;
+  const attendancePercentage = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 0.0;
+  const isEligible = total > 0 ? attendancePercentage >= 75.0 : false;
 
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-6">

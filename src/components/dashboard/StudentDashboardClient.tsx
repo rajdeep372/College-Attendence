@@ -66,6 +66,7 @@ interface StudentAnalytics {
   overallPercentage: number;
   isEligible: boolean;
   allowedAbsences: number;
+  classesNeededToRecover?: number;
   subjects: SubjectLedgerItem[];
   recentCirculars: CircularItem[];
   leaves: LeaveItem[];
@@ -90,9 +91,9 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
     distanceMeters: number | null;
     statusText: string;
   }>({
-    insideCampus: true,
-    distanceMeters: 18,
-    statusText: "Inside Campus Perimeter (18m)",
+    insideCampus: false,
+    distanceMeters: null,
+    statusText: "Detecting campus location...",
   });
 
   // Soft copy upload state
@@ -118,20 +119,46 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
         role: "Student",
         userId: currentUser?._id || "",
         department: currentUser?.department || "",
+        semester: (currentUser?.semester || 1).toString(),
+        section: currentUser?.section || "Section A",
       });
       const res = await fetch(`/api/analytics?${params.toString()}`);
       const data = await res.json();
       if (data.success && data.analytics) {
         setAnalytics(data.analytics);
 
-        // Check if there is an upcoming lecture in the next 15 minutes
+        // Check if there is an actual upcoming or currently active lecture matching real clock
         if (data.analytics.todayRoutines && data.analytics.todayRoutines.length > 0) {
-          const firstRoutine = data.analytics.todayRoutines[0];
-          setUpcomingClass({
-            subject: firstRoutine.subject,
-            timeSlot: firstRoutine.timeSlot,
-            startsInMinutes: 8,
-          });
+          const now = new Date();
+          const currentMinutes = now.getHours() * 60 + now.getMinutes();
+          let activeUpcoming: { subject: string; timeSlot: string; startsInMinutes: number } | null = null;
+
+          for (const r of data.analytics.todayRoutines) {
+            const match = r.timeSlot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+            if (match) {
+              let hours = parseInt(match[1], 10);
+              const minutes = parseInt(match[2], 10);
+              const meridiem = match[3].toUpperCase();
+              if (meridiem === "PM" && hours < 12) hours += 12;
+              if (meridiem === "AM" && hours === 12) hours = 0;
+
+              const slotStartMinutes = hours * 60 + minutes;
+              const diffMinutes = slotStartMinutes - currentMinutes;
+
+              // If starting within next 20 minutes or currently underway (within 50 minutes of start)
+              if (diffMinutes >= -50 && diffMinutes <= 20) {
+                activeUpcoming = {
+                  subject: r.subject,
+                  timeSlot: r.timeSlot,
+                  startsInMinutes: Math.max(0, diffMinutes),
+                };
+                break;
+              }
+            }
+          }
+          setUpcomingClass(activeUpcoming);
+        } else {
+          setUpcomingClass(null);
         }
       }
     } catch (err) {
@@ -160,11 +187,15 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
             distanceMeters: Math.round(dist),
             statusText: isInside
               ? `Inside Campus (${Math.round(dist)}m)`
-              : `At Home / Outside Campus (${(dist / 1000).toFixed(1)} km)`,
+              : `Outside Campus (${(dist / 1000).toFixed(1)} km)`,
           });
         },
         () => {
-          // Geolocation permission not granted; defaults to safe campus tag
+          setGeoStatus({
+            insideCampus: false,
+            distanceMeters: null,
+            statusText: "Campus GPS idle",
+          });
         }
       );
     }
@@ -248,10 +279,13 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
     }
   };
 
-  const roll = currentUser?.rollNumber || "2023-CS-000";
+  const roll = currentUser?.rollNumber || (currentUser?.email ? currentUser.email.split("@")[0].toUpperCase() : "NO-ROLL");
   const overallPct = analytics ? analytics.overallPercentage : 0.0;
-  const isEligible = overallPct >= 75;
+  const totalConducted = analytics ? analytics.totalConducted : 0;
+  const totalAttended = analytics ? analytics.totalAttended : 0;
+  const isEligible = analytics ? analytics.isEligible : false;
   const allowedAbsences = analytics ? analytics.allowedAbsences : 0;
+  const classesNeededToRecover = analytics?.classesNeededToRecover || 0;
   const subjects = analytics?.subjects || [];
   const circulars = analytics?.recentCirculars || [];
   const leaves = analytics?.leaves || [];
@@ -377,7 +411,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
             
             <div className="relative w-36 h-36 rounded-full border-8 border-sky-500/20 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(56,189,248,0.25)]">
               <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-200">
-                {overallPct}%
+                {totalConducted > 0 ? `${overallPct.toFixed(1)}%` : "0%"}
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider text-sky-300">
                 Current Turnout
@@ -386,12 +420,19 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
 
             <div
               className={`mt-4 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                isEligible
+                totalConducted === 0
+                  ? "bg-slate-800 text-slate-300 border border-white/10"
+                  : isEligible
                   ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                   : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
               }`}
             >
-              {isEligible ? (
+              {totalConducted === 0 ? (
+                <>
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <span>No Classes Conducted (0%)</span>
+                </>
+              ) : isEligible ? (
                 <>
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>Exam Eligible (&ge;75%)</span>
@@ -402,6 +443,12 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                   <span>Defaulter Notice (&lt;75%)</span>
                 </>
               )}
+            </div>
+
+            <div className="mt-2 text-[11px] text-slate-400 font-mono">
+              {totalConducted > 0
+                ? `${totalAttended} attended of ${totalConducted} classes`
+                : "0 classes conducted yet"}
             </div>
           </div>
 
@@ -452,7 +499,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Section</span>
-                  <span>{currentUser?.section || "A"}</span>
+                  <span>{currentUser?.section || "Section A"}</span>
                 </div>
               </div>
             )}
@@ -483,10 +530,32 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               <div className="space-y-2.5 text-xs">
                 <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex justify-between items-center">
                   <span className="text-slate-300">Safe Permissible Bunks:</span>
-                  <span className={`font-bold ${allowedAbsences > 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {allowedAbsences > 0 ? `Up to ${allowedAbsences} Classes` : "0 (At Limit)"}
+                  <span
+                    className={`font-bold ${
+                      totalConducted === 0
+                        ? "text-slate-400"
+                        : allowedAbsences > 0
+                        ? "text-emerald-400"
+                        : "text-rose-400"
+                    }`}
+                  >
+                    {totalConducted === 0
+                      ? "0 (No Sessions Held Yet)"
+                      : allowedAbsences > 0
+                      ? `Up to ${allowedAbsences} Classes`
+                      : "0 (At Limit / Defaulter)"}
                   </span>
                 </div>
+
+                {totalConducted > 0 && !isEligible && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/20 flex justify-between items-center text-rose-300">
+                    <span>Classes Needed to Reach 75%:</span>
+                    <span className="font-bold text-rose-400">
+                      {classesNeededToRecover} Consecutive Classes
+                    </span>
+                  </div>
+                )}
+
                 <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex justify-between items-center">
                   <span className="text-slate-300">Session Year / Semester:</span>
                   <span className="font-bold text-sky-300">
@@ -537,27 +606,31 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                     </div>
                     <span
                       className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                        sub.percent >= 85
+                        sub.total === 0
+                          ? "text-slate-400 bg-slate-800/80 border border-white/10"
+                          : sub.percent >= 85
                           ? "text-emerald-400 bg-emerald-950/60 border border-emerald-500/30"
                           : sub.percent >= 75
                           ? "text-sky-400 bg-sky-950/60 border border-sky-500/30"
                           : "text-rose-400 bg-rose-950/60 border border-rose-500/30"
                       }`}
                     >
-                      {sub.percent.toFixed(1)}%
+                      {sub.total === 0 ? "0.0% (No Sessions)" : `${sub.percent.toFixed(1)}%`}
                     </span>
                   </div>
 
                   <div className="w-full bg-slate-800 rounded-full h-2 my-2 overflow-hidden">
                     <div
                       className={`h-2 rounded-full ${
-                        sub.percent >= 85
+                        sub.total === 0
+                          ? "bg-slate-700"
+                          : sub.percent >= 85
                           ? "bg-gradient-to-r from-sky-500 to-emerald-400"
                           : sub.percent >= 75
                           ? "bg-gradient-to-r from-blue-500 to-sky-400"
                           : "bg-gradient-to-r from-rose-500 to-amber-500"
                       }`}
-                      style={{ width: `${Math.min(sub.percent, 100)}%` }}
+                      style={{ width: `${sub.total === 0 ? 0 : Math.min(sub.percent, 100)}%` }}
                     />
                   </div>
 

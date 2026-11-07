@@ -97,18 +97,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
     return () => clearInterval(interval);
   }, []);
 
-  const todayClasses = analytics?.todayClasses || [
-    {
-      _id: "demo-1",
-      code: "CS-504",
-      title: "Database Management Systems",
-      time: "11:30 AM - 12:30 PM",
-      hall: "Lecture Hall CS-301",
-      status: "Live Now",
-      attendance: "Roster Active",
-    },
-  ];
-
+  const todayClasses = analytics?.todayClasses || [];
   const defaulterList = analytics?.defaulters || [];
 
   return (
@@ -228,7 +217,12 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             </div>
 
             <div className="space-y-4">
-              {todayClasses.map((cls, idx) => (
+              {todayClasses.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  No lectures scheduled for today in the institutional timetable.
+                </div>
+              ) : (
+                todayClasses.map((cls, idx) => (
                 <div
                   key={cls._id || idx}
                   className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -264,7 +258,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                     </span>
                   </div>
                 </div>
-              ))}
+              )))}
             </div>
           </div>
 

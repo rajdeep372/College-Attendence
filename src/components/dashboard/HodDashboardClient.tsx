@@ -334,7 +334,7 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
                   <div className="flex justify-between text-slate-300 mb-1">
                     <span>Faculty Registry Complete</span>
                     <span className="text-emerald-400 font-semibold">
-                      {analytics?.facultyCount || 24} Active Instructors
+                      {analytics?.facultyCount || 0} Active Instructors
                     </span>
                   </div>
                   <div className="w-full bg-slate-800 rounded-full h-1.5">
