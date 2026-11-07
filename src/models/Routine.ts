@@ -6,6 +6,7 @@ export interface IRoutine extends Document {
   semester: number;
   section: string;
   dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday";
+  paperCode?: string;
   subject: string;
   timeSlot: string;
   teacherId: Types.ObjectId;
@@ -47,6 +48,11 @@ const RoutineSchema = new Schema<IRoutine>(
       required: [true, "Day of week is required"],
       enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
       index: true,
+    },
+    paperCode: {
+      type: String,
+      trim: true,
+      default: "",
     },
     subject: {
       type: String,

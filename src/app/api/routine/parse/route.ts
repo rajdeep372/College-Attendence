@@ -3,7 +3,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { connectToDatabase } from "@/lib/mongodb";
 import Routine from "@/models/Routine";
 import User from "@/models/User";
-import mongoose from "mongoose";
 
 interface ParsedScheduleItem {
   dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday";
@@ -12,6 +11,8 @@ interface ParsedScheduleItem {
   subject: string;
   teacher: string;
   semester: number;
+  academicYear?: string;
+  section?: string;
   department: string;
 }
 
@@ -40,68 +41,104 @@ export async function POST(req: NextRequest) {
     const base64Data = buffer.toString("base64");
 
     const apiKey = process.env.GEMINI_API_KEY;
-    const hasValidApiKey = apiKey && !apiKey.includes("your_gemini") && apiKey.length > 10;
+    if (!apiKey || apiKey.includes("your_gemini") || apiKey.length < 10) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: "GEMINI_API_KEY is not configured in .env.local. Please provide a valid Gemini API key to enable OCR vision timetable parsing." 
+        },
+        { status: 400 }
+      );
+    }
 
     let parsedSchedules: ParsedScheduleItem[] = [];
+    const genAI = new GoogleGenerativeAI(apiKey);
 
-    if (hasValidApiKey) {
+    const prompt = `You are a strict Optical Character Recognition (OCR) data extractor. You must ONLY extract the exact text visible in the uploaded image. DO NOT invent, guess, or generate any dummy names, subjects, or paper codes. If a faculty name is "Mr. Falguni Adhikary", you must output exactly that.
+
+Your task is to analyze this official college routine/timetable image:
+
+1. TOP MAIN TIMETABLE GRID:
+   - Rows: Days of the week (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday).
+   - Columns: Time slots / periods (e.g., 10:00 AM - 11:00 AM, 11:00 AM - 12:00 PM, 12:00 PM - 01:00 PM, 02:00 PM - 04:00 PM, etc.).
+   - Grid cells contain Paper Codes (e.g., BCAC501, BCAC502, BCA591, etc.) and sometimes room numbers or teacher initials.
+   - EXCLUDE MERGED BREAKS: If any period/column is marked "BREAK", "RECESS", "LUNCH", "TIFFIN", or empty, DO NOT output any break entries.
+   - MULTI-SLOT LABS: If a laboratory class spans two consecutive time slots (e.g., 02:00 PM - 04:00 PM), combine them into a single session with the complete time slot.
+
+2. SECONDARY MAPPING TABLE AT THE BOTTOM OF THE IMAGE:
+   - Carefully read the secondary mapping table / legend at the bottom of the image.
+   - It maps each Paper Code to its exact Paper/Subject Name (e.g., "Introduction to Machine Learning", "Advanced Python Lab", etc.) and the exact assigned Faculty/Teacher Name (e.g., "Mr. Falguni Adhikary", "Dr. A. Roy", etc.).
+   - You MUST cross-reference every Paper Code found in the main timetable grid with this bottom table to resolve the exact Paper Name and exact Faculty Name.
+
+STRICT EXTRACTION RULES:
+- NEVER hallucinate or substitute standard placeholder courses (e.g., do NOT output "Cloud Computing" or "Dr. S. Mukherjee" unless those exact words appear in this image).
+- If a faculty name is "Mr. Falguni Adhikary", output exactly "Mr. Falguni Adhikary".
+- If a subject name is "Introduction to Machine Learning", output exactly "Introduction to Machine Learning" (or prefixed with its paper code).
+- Enforce strict JSON output format matching this exact schema:
+[
+  {
+    "dayOfWeek": "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday",
+    "timeSlot": "e.g. 10:00 AM - 11:00 AM",
+    "paperCode": "exact paper code e.g. BCAC501",
+    "subject": "exact paper name from bottom mapping table e.g. Introduction to Machine Learning",
+    "teacher": "exact faculty name from bottom mapping table e.g. Mr. Falguni Adhikary",
+    "semester": ${customSemester},
+    "academicYear": "${customAcademicYear}",
+    "section": "${customSection}",
+    "department": "${customDepartment}"
+  }
+]
+
+Do not include markdown fences or explanatory text. Return ONLY the raw JSON array.`;
+
+    const imagePart = {
+      inlineData: {
+        data: base64Data,
+        mimeType: mimeType,
+      },
+    };
+
+    // Candidate Gemini Vision models in order of capability and availability
+    const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"];
+    let lastError: Error | null = null;
+    let extractionSucceeded = false;
+
+    for (const modelName of candidateModels) {
       try {
-        console.log("[Smart AI Routine Parser] Sending complex grid to Gemini Vision API...");
-        const genAI = new GoogleGenerativeAI(apiKey);
+        console.log(`[Smart AI Routine Parser] Attempting OCR Vision extraction with model: ${modelName}...`);
         const model = genAI.getGenerativeModel({
-          model: "gemini-1.5-flash",
+          model: modelName,
           generationConfig: {
             responseMimeType: "application/json",
           },
         });
 
-        const prompt = `You are an expert institutional AI timetable parser specialized in university engineering & BCA class routines.
-Analyze this college routine image carefully. It typically contains two distinct sections:
-1. TOP MAIN TIMETABLE GRID:
-   - Rows: Days of the week (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday).
-   - Columns: Time slots (e.g., 10:00 AM - 11:00 AM, 11:00 AM - 12:00 PM, 12:00 PM - 01:00 PM, etc.).
-   - Cells contain Paper Codes (e.g., BCAC701B, BCAC702, BCA791, HU701) and sometimes room or teacher initials.
-   - MERGED BREAKS: Columns or periods labeled "BREAK", "RECESS", "LUNCH", "TIFFIN", or empty spaces MUST BE COMPLETELY EXCLUDED. Do not output any breaks.
-   - MULTI-SLOT LABS: If a laboratory class spans across 2 time slots (e.g., 02:00 PM - 04:00 PM or two consecutive afternoon periods), capture the complete duration as a multi-slot lab session.
-
-2. SECONDARY BOTTOM TABLE / LEGEND:
-   - A mapping table that pairs each 'Paper Code' with its full 'Subject Name' and the assigned 'Faculty Name' (e.g., BCAC701B -> Cloud Computing & Virtualization -> Dr. S. Mukherjee).
-
-TASK:
-- Cross-reference every Paper Code found in the main timetable grid with the bottom legend table.
-- Resolve each class to its full Subject Name and assigned Faculty Name.
-- Output a valid JSON array of objects with these exact keys:
-[
-  {
-    "dayOfWeek": "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday",
-    "timeSlot": "e.g. 10:00 AM - 11:00 AM" or "02:00 PM - 04:00 PM",
-    "paperCode": "e.g. BCAC701B",
-    "subject": "e.g. BCAC701B - Cloud Computing & Virtualization",
-    "teacher": "e.g. Dr. S. Mukherjee",
-    "semester": ${customSemester},
-    "department": "${customDepartment}"
-  }
-]
-Clean up course codes, teacher honorifics (Dr./Prof.), and format times consistently.`;
-
-        const imagePart = {
-          inlineData: {
-            data: base64Data,
-            mimeType: mimeType,
-          },
-        };
-
         const result = await model.generateContent([prompt, imagePart]);
         const responseText = result.response.text();
         const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-        parsedSchedules = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-      } catch (geminiError) {
-        console.warn("[Smart AI Routine Parser] Gemini API error, falling back to intelligent OCR heuristic engine:", geminiError);
-        parsedSchedules = getRealisticRoutineFallback(customDepartment, customSemester);
+        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
+
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          parsedSchedules = parsed;
+          extractionSucceeded = true;
+          console.log(`[Smart AI Routine Parser] Successfully extracted ${parsed.length} lectures using ${modelName}.`);
+          break;
+        }
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(`[Smart AI Routine Parser] Model ${modelName} failed:`, lastError.message);
       }
-    } else {
-      console.log("[Smart AI Routine Parser] GEMINI_API_KEY unconfigured or simulated. Utilizing intelligent heuristic timetable mapper.");
-      parsedSchedules = getRealisticRoutineFallback(customDepartment, customSemester);
+    }
+
+    if (!extractionSucceeded || parsedSchedules.length === 0) {
+      const errorMsg = lastError?.message || "Could not detect or extract timetable cells from the uploaded image.";
+      return NextResponse.json(
+        {
+          success: false,
+          error: `AI OCR Extraction Error: ${errorMsg}. Please ensure the uploaded image has clear contrast and visible timetable rows and mapping tables.`,
+        },
+        { status: 422 }
+      );
     }
 
     // Standardize days of week, time slots, and formats
@@ -109,18 +146,32 @@ Clean up course codes, teacher honorifics (Dr./Prof.), and format times consiste
     parsedSchedules = parsedSchedules
       .filter((item) => {
         const subj = (item.subject || "").toLowerCase();
-        // Discard any breaks that leaked through
+        // Discard any breaks or lunches
         return !subj.includes("break") && !subj.includes("recess") && !subj.includes("lunch") && !subj.includes("tiffin");
       })
-      .map((item) => ({
-        ...item,
-        dayOfWeek: validDays.includes(item.dayOfWeek) ? item.dayOfWeek : "Monday",
-        department: item.department || customDepartment,
-        semester: Number(item.semester) || customSemester,
-        timeSlot: item.timeSlot || "10:00 AM - 11:00 AM",
-        subject: item.subject || "BCAC701B - Cloud Computing & Virtualization",
-        teacher: item.teacher || "Dr. S. Mukherjee",
-      }));
+      .map((item) => {
+        const rawDay = item.dayOfWeek || "Monday";
+        const matchedDay = validDays.find((d) => d.toLowerCase() === rawDay.toLowerCase()) || "Monday";
+        const cleanPaperCode = (item.paperCode || "").trim();
+        let cleanSubject = (item.subject || cleanPaperCode || "Scheduled Class").trim();
+
+        // If paperCode is not prefixed and is available, prefix for maximum clarity
+        if (cleanPaperCode && !cleanSubject.startsWith(cleanPaperCode)) {
+          cleanSubject = `${cleanPaperCode} - ${cleanSubject}`;
+        }
+
+        return {
+          dayOfWeek: matchedDay as ParsedScheduleItem["dayOfWeek"],
+          department: item.department || customDepartment,
+          academicYear: item.academicYear || customAcademicYear,
+          semester: Number(item.semester) || customSemester,
+          section: item.section || customSection,
+          timeSlot: (item.timeSlot || "10:00 AM - 11:00 AM").trim(),
+          paperCode: cleanPaperCode,
+          subject: cleanSubject,
+          teacher: (item.teacher || "Faculty Instructor").trim(),
+        };
+      });
 
     // If shouldSave is true, save directly into MongoDB Routine collection
     let insertedRoutines: any[] = [];
@@ -145,7 +196,7 @@ Clean up course codes, teacher honorifics (Dr./Prof.), and format times consiste
 
           // Auto-provision teacher if not present in MongoDB
           if (!teacherDoc) {
-            const emailSlug = cleanTeacherName.toLowerCase().replace(/\s+/g, ".") || "faculty";
+            const emailSlug = cleanTeacherName.toLowerCase().replace(/[^a-z0-9]/g, ".") || "faculty";
             teacherDoc = await User.create({
               clerkId: `teacher_auto_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
               name: item.teacher,
@@ -163,6 +214,7 @@ Clean up course codes, teacher honorifics (Dr./Prof.), and format times consiste
             semester: item.semester,
             section: customSection,
             dayOfWeek: item.dayOfWeek,
+            paperCode: item.paperCode,
             subject: item.subject,
             timeSlot: item.timeSlot,
             teacherId: teacherDoc._id,
@@ -172,197 +224,26 @@ Clean up course codes, teacher honorifics (Dr./Prof.), and format times consiste
 
       // 3. Bulk insert into MongoDB
       insertedRoutines = await Routine.insertMany(routineDocs);
-      console.log(`[Smart AI Routine Parser] Inserted ${insertedRoutines.length} resolved routine records into MongoDB.`);
+      console.log(`[Smart AI Routine Parser] Inserted ${insertedRoutines.length} resolved routine records into MongoDB for ${customDepartment} (${customSection}).`);
     }
 
     return NextResponse.json({
       success: true,
-      message: `Successfully resolved and extracted ${parsedSchedules.length} classes from complex timetable grid.`,
-      isAiSimulated: !hasValidApiKey,
+      message: `Successfully extracted and linked ${parsedSchedules.length} classes from uploaded timetable.`,
       count: parsedSchedules.length,
       savedToDatabase: shouldSave,
       data: parsedSchedules,
       insertedCount: insertedRoutines.length,
       department: customDepartment,
+      academicYear: customAcademicYear,
       semester: customSemester,
+      section: customSection,
     });
   } catch (error: unknown) {
     console.error("[API: /api/routine/parse] Error:", error);
     const message = error instanceof Error ? error.message : "Failed to parse college routine";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
-}
-
-// Complex Timetable Heuristic Fallback Engine
-// Models standard BCA / B.Tech two-table format with Paper Code resolution, skipped breaks, and multi-slot labs
-function getRealisticRoutineFallback(department: string, semester: number): ParsedScheduleItem[] {
-  return [
-    // MONDAY
-    {
-      dayOfWeek: "Monday",
-      timeSlot: "10:00 AM - 11:00 AM",
-      paperCode: "BCAC701B",
-      subject: "BCAC701B - Cloud Computing & Virtualization",
-      teacher: "Dr. S. Mukherjee",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Monday",
-      timeSlot: "11:00 AM - 12:00 PM",
-      paperCode: "BCAC702",
-      subject: "BCAC702 - Artificial Intelligence & Neural Networks",
-      teacher: "Prof. Ananya Sen",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Monday",
-      timeSlot: "12:00 PM - 01:00 PM",
-      paperCode: "BCAC703",
-      subject: "BCAC703 - Cyber Security & Cryptography",
-      teacher: "Dr. K. Iyer",
-      semester,
-      department,
-    },
-    // Multi-slot Lab: 02:00 PM - 04:00 PM (Break 01:00 - 02:00 PM intentionally omitted)
-    {
-      dayOfWeek: "Monday",
-      timeSlot: "02:00 PM - 04:00 PM",
-      paperCode: "BCA791",
-      subject: "BCA791 - Advanced Python & Machine Learning Lab",
-      teacher: "Dr. R. Banerjee",
-      semester,
-      department,
-    },
-
-    // TUESDAY
-    {
-      dayOfWeek: "Tuesday",
-      timeSlot: "10:00 AM - 11:00 AM",
-      paperCode: "BCAC702",
-      subject: "BCAC702 - Artificial Intelligence & Neural Networks",
-      teacher: "Prof. Ananya Sen",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Tuesday",
-      timeSlot: "11:00 AM - 12:00 PM",
-      paperCode: "BCAC704",
-      subject: "BCAC704 - Distributed Database Management Systems",
-      teacher: "Dr. Arvind Sharma",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Tuesday",
-      timeSlot: "12:00 PM - 01:00 PM",
-      paperCode: "HU701",
-      subject: "HU701 - Values & Professional Ethics",
-      teacher: "Prof. M. Roy",
-      semester,
-      department,
-    },
-    // Multi-slot Lab
-    {
-      dayOfWeek: "Tuesday",
-      timeSlot: "02:00 PM - 04:00 PM",
-      paperCode: "BCA792",
-      subject: "BCA792 - Cloud Virtualization & Containerization Lab",
-      teacher: "Prof. Priya Nair",
-      semester,
-      department,
-    },
-
-    // WEDNESDAY
-    {
-      dayOfWeek: "Wednesday",
-      timeSlot: "10:00 AM - 11:00 AM",
-      paperCode: "BCAC701B",
-      subject: "BCAC701B - Cloud Computing & Virtualization",
-      teacher: "Dr. S. Mukherjee",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Wednesday",
-      timeSlot: "11:00 AM - 12:00 PM",
-      paperCode: "BCAC703",
-      subject: "BCAC703 - Cyber Security & Cryptography",
-      teacher: "Dr. K. Iyer",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Wednesday",
-      timeSlot: "02:00 PM - 03:00 PM",
-      paperCode: "BCAC704",
-      subject: "BCAC704 - Distributed Database Management Systems",
-      teacher: "Dr. Arvind Sharma",
-      semester,
-      department,
-    },
-
-    // THURSDAY
-    {
-      dayOfWeek: "Thursday",
-      timeSlot: "10:00 AM - 11:00 AM",
-      paperCode: "BCAC702",
-      subject: "BCAC702 - Artificial Intelligence & Neural Networks",
-      teacher: "Prof. Ananya Sen",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Thursday",
-      timeSlot: "11:00 AM - 12:00 PM",
-      paperCode: "HU701",
-      subject: "HU701 - Values & Professional Ethics",
-      teacher: "Prof. M. Roy",
-      semester,
-      department,
-    },
-    // Multi-slot Lab
-    {
-      dayOfWeek: "Thursday",
-      timeSlot: "02:00 PM - 04:00 PM",
-      paperCode: "BCA791",
-      subject: "BCA791 - Advanced Python & Machine Learning Lab",
-      teacher: "Dr. R. Banerjee",
-      semester,
-      department,
-    },
-
-    // FRIDAY
-    {
-      dayOfWeek: "Friday",
-      timeSlot: "10:00 AM - 11:00 AM",
-      paperCode: "BCAC701B",
-      subject: "BCAC701B - Cloud Computing & Virtualization",
-      teacher: "Dr. S. Mukherjee",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Friday",
-      timeSlot: "11:00 AM - 12:00 PM",
-      paperCode: "BCAC704",
-      subject: "BCAC704 - Distributed Database Management Systems",
-      teacher: "Dr. Arvind Sharma",
-      semester,
-      department,
-    },
-    {
-      dayOfWeek: "Friday",
-      timeSlot: "12:00 PM - 01:00 PM",
-      paperCode: "BCAC703",
-      subject: "BCAC703 - Cyber Security & Cryptography",
-      teacher: "Dr. K. Iyer",
-      semester,
-      department,
-    },
-  ];
 }
 
 export async function GET(req: NextRequest) {
