@@ -6,6 +6,7 @@ import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
 import { AbsentFirstGridView } from "@/components/attendance/AbsentFirstGridView";
 import { ParentAdvisoryModal } from "@/components/modals/ParentAdvisoryModal";
+import { ApplyLeaveModal } from "@/components/modals/ApplyLeaveModal";
 import { 
   QrCode, 
   MapPin, 
@@ -17,7 +18,8 @@ import {
   Smartphone,
   CheckCheck,
   RefreshCw,
-  Send
+  Send,
+  FileText
 } from "lucide-react";
 
 interface TodayClass {
@@ -48,6 +50,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
   const [isQrActive, setIsQrActive] = useState(false);
   const [totpPin, setTotpPin] = useState("8421");
   const [isAdvisoryModalOpen, setIsAdvisoryModalOpen] = useState(false);
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
   const [analytics, setAnalytics] = useState<TeacherAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -132,6 +135,14 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setIsLeaveModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-semibold bg-slate-900/80 hover:bg-slate-800 text-emerald-300 border border-emerald-500/30 shadow-md transition-all cursor-pointer"
+              >
+                <FileText className="w-4 h-4" />
+                <span>Apply for Faculty Leave</span>
+              </button>
+
               <button
                 onClick={() => setIsQrActive(!isQrActive)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all cursor-pointer"
@@ -310,6 +321,14 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
           onClose={() => setIsAdvisoryModalOpen(false)}
           department={user?.department || "Computer Science & Engineering"}
           defaulters={defaulterList}
+        />
+
+        {/* Apply Faculty Leave Modal */}
+        <ApplyLeaveModal
+          isOpen={isLeaveModalOpen}
+          onClose={() => setIsLeaveModalOpen(false)}
+          userRole="Teacher"
+          department={user?.department || "Computer Science & Engineering"}
         />
       </div>
     </RoleGuard>

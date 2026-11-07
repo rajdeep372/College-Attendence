@@ -30,11 +30,27 @@ function DashboardAutoRouter() {
       return;
     }
 
-    // Auto-resolve role based on institutional email prefix
-    const role = validation.role || deriveRoleFromEmail(email);
-    const targetPath = getRoleDashboardPath(role);
+    // Verify if user is onboarded
+    async function checkOnboardingAndRedirect() {
+      try {
+        const res = await fetch("/api/onboarding");
+        const data = await res.json();
 
-    router.replace(targetPath);
+        if (data.success && data.onboarded) {
+          const role = data.user?.role || validation.role || deriveRoleFromEmail(email);
+          const targetPath = getRoleDashboardPath(role);
+          router.replace(targetPath);
+        } else {
+          router.replace("/onboarding");
+        }
+      } catch {
+        // Fallback to role dashboard
+        const role = validation.role || deriveRoleFromEmail(email);
+        router.replace(getRoleDashboardPath(role));
+      }
+    }
+
+    checkOnboardingAndRedirect();
   }, [isLoaded, isSignedIn, user, router]);
 
   return (

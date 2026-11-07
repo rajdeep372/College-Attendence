@@ -10,6 +10,10 @@ export interface IUser extends Document {
   role: UserRole;
   department: string;
   rollNumber?: string;
+  semester?: number;
+  section?: string;
+  designation?: string;
+  onboarded: boolean;
   profilePicture?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -61,6 +65,27 @@ const UserSchema = new Schema<IUser>(
       type: String,
       trim: true,
       default: "",
+      index: true,
+    },
+    semester: {
+      type: Number,
+      min: 1,
+      max: 12,
+      default: 1,
+    },
+    section: {
+      type: String,
+      trim: true,
+      default: "A",
+    },
+    designation: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    onboarded: {
+      type: Boolean,
+      default: false,
       index: true,
     },
     profilePicture: {

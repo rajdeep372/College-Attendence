@@ -88,18 +88,24 @@ export async function POST(req: NextRequest) {
     const rollNumber = deriveRollNumber(email, autoAssignedRole, metaRoll);
     const phone = bodyData.phone || "";
 
+    // Check if user has already onboarded to preserve their custom entries
+    const existing = await User.findOne({ clerkId });
+    const finalDepartment = (existing?.onboarded && existing.department) ? existing.department : department;
+    const finalRollNumber = (existing?.onboarded && existing.rollNumber) ? existing.rollNumber : rollNumber;
+    const finalRole = (existing?.onboarded && existing.role) ? existing.role : autoAssignedRole;
+
     // Upsert User in MongoDB with exact institutional credentials
     const syncedUser = await User.findOneAndUpdate(
       { clerkId },
       {
         clerkId,
-        name: name || "Campus Scholar",
+        name: name || existing?.name || "Campus Scholar",
         email: email.toLowerCase().trim(),
-        phone,
-        role: autoAssignedRole,
-        department,
-        rollNumber,
-        profilePicture: profilePicture || "",
+        phone: phone || existing?.phone || "",
+        role: finalRole,
+        department: finalDepartment,
+        rollNumber: finalRollNumber,
+        profilePicture: profilePicture || existing?.profilePicture || "",
       },
       {
         upsert: true,

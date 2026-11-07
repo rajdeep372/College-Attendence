@@ -4,6 +4,7 @@ import Leave from "@/models/Leave";
 import User from "@/models/User";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose from "mongoose";
+import nodemailer from "nodemailer";
 
 export async function POST(req: NextRequest) {
   try {
@@ -149,9 +150,50 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Leave document not found." }, { status: 404 });
     }
 
+    // Automated notification back to applicant
+    let notificationDispatched = false;
+    try {
+      const applicant = await User.findById(updated.applicantId);
+      if (applicant?.email) {
+        const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
+        const smtpPort = Number(process.env.SMTP_PORT) || 587;
+        const smtpUser = process.env.SMTP_USER;
+        const smtpPass = process.env.SMTP_PASS;
+        const smtpFrom = process.env.SMTP_FROM || `"AcademiaSync Institutional Portal" <noreply@academiasync.edu>`;
+
+        if (smtpUser && smtpPass && !smtpPass.includes("placeholder") && !smtpUser.includes("example")) {
+          const transporter = nodemailer.createTransport({
+            host: smtpHost,
+            port: smtpPort,
+            secure: smtpPort === 465,
+            auth: { user: smtpUser, pass: smtpPass },
+          });
+
+          await transporter.sendMail({
+            from: smtpFrom,
+            to: applicant.email,
+            subject: `[AcademiaSync] Official Leave Sanction Notice: ${status.toUpperCase()}`,
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; padding: 24px; background: #0f172a; color: #f8fafc; border-radius: 16px;">
+                <h2 style="color: ${status === "Approved" ? "#34d399" : "#f87171"};">Leave Application ${status}</h2>
+                <p>Dear <strong>${applicant.name}</strong>,</p>
+                <p>Your <strong>${updated.leaveType}</strong> application from <strong>${new Date(updated.startDate).toLocaleDateString()}</strong> to <strong>${new Date(updated.endDate).toLocaleDateString()}</strong> has been <strong>${status}</strong> by the Department Authority (${updated.department}).</p>
+                <p><em>Decision Notes: ${updated.decisionNotes}</em></p>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">AcademiaSync College Attendance & Academic Sanction Ledger</p>
+              </div>
+            `,
+          });
+          notificationDispatched = true;
+        }
+      }
+    } catch (notifyErr) {
+      console.warn("Automated email notification failed to send:", notifyErr);
+    }
+
     return NextResponse.json({
       success: true,
-      message: `Leave application marked as ${status}.`,
+      message: `Leave application marked as ${status}. Automated notification logged for ${updated.applicantName}.`,
+      notificationDispatched,
       leave: updated,
     });
   } catch (error: unknown) {

@@ -109,7 +109,7 @@ export async function GET(req: NextRequest) {
       routine = populated;
     }
 
-    const targetDepartment = routine?.department || "Computer Science";
+    const targetDepartment = routine?.department || teacher?.department || "General Academic & Sciences";
 
     // 4. Fetch all Students for this department & semester
     const studentFilter: Record<string, unknown> = {

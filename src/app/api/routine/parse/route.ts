@@ -216,3 +216,36 @@ function getRealisticRoutineFallback(department: string, semester: number): Pars
   ];
 }
 
+export async function GET(req: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const { searchParams } = new URL(req.url);
+    const department = searchParams.get("department");
+    const semester = searchParams.get("semester");
+
+    const query: Record<string, unknown> = {};
+    if (department) {
+      query.department = department;
+    }
+    if (semester) {
+      query.semester = Number(semester);
+    }
+
+    const routines = await Routine.find(query)
+      .populate("teacherId", "name email")
+      .sort({ dayOfWeek: 1, timeSlot: 1 })
+      .lean();
+
+    return NextResponse.json({
+      success: true,
+      count: routines.length,
+      routines,
+    });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Error fetching routines";
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}
+
+

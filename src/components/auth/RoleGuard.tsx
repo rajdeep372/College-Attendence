@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { UserRole } from "@/models/User";
 import { SerializedUser } from "@/lib/actions/user.actions";
-import { ShieldAlert, ArrowRight, Lock } from "lucide-react";
+import { ShieldAlert, ArrowRight, Lock, Sparkles } from "lucide-react";
 import { getRoleDashboardPath } from "@/lib/auth-rbac";
 
 interface RoleGuardProps {
@@ -33,6 +33,32 @@ export function RoleGuard({ allowedRole, user, children }: RoleGuardProps) {
           </Link>
         </div>
         {children}
+      </div>
+    );
+  }
+
+  // If user has not completed onboarding
+  if (user && user.onboarded === false) {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-6 sm:p-8 rounded-3xl glass-card border-2 border-sky-500/40 text-center shadow-[0_20px_50px_rgba(56,189,248,0.25)] animate-fade-in relative overflow-hidden text-white">
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-400 flex items-center justify-center mb-4 shadow-lg">
+          <Sparkles className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          Mandatory Onboarding Required
+        </h2>
+        <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed max-w-md mx-auto">
+          Please complete your initial registration with your Roll Number, Department, and Semester to map your classes and access your dashboard.
+        </p>
+        <div className="mt-6">
+          <Link
+            href="/onboarding"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_25px_rgba(56,189,248,0.4)] transition-all"
+          >
+            <span>Complete Setup Now</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
       </div>
     );
   }

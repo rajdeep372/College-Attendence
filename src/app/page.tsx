@@ -17,6 +17,7 @@ import {
   deriveRoleFromEmail, 
   getRoleDashboardPath 
 } from "@/lib/auth-rbac";
+import { getCurrentUser } from "@/lib/actions/user.actions";
 
 export default async function HomePage() {
   let clerkUser = null;
@@ -71,9 +72,14 @@ export default async function HomePage() {
       );
     }
 
-    // Email is valid institutional account -> derive role and auto-redirect
-    const assignedRole = deriveRoleFromEmail(primaryEmail);
-    const targetDashboard = getRoleDashboardPath(assignedRole);
+    // Check if user has completed mandatory onboarding
+    const dbUser = await getCurrentUser();
+    if (!dbUser || !dbUser.onboarded) {
+      redirect("/onboarding");
+    }
+
+    // Email is valid and user is onboarded -> redirect to their designated dashboard
+    const targetDashboard = getRoleDashboardPath(dbUser.role);
     redirect(targetDashboard);
   }
 

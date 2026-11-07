@@ -7,6 +7,7 @@ import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
 import { RoutineUploadDropzone } from "@/components/routine/RoutineUploadDropzone";
 import { AtRiskStudentsCard } from "@/components/dashboard/AtRiskStudentsCard";
 import { BroadcastCircularModal } from "@/components/modals/BroadcastCircularModal";
+import { DepartmentRoutineModal } from "@/components/modals/DepartmentRoutineModal";
 import { 
   Award, 
   Users, 
@@ -21,7 +22,8 @@ import {
   X,
   RefreshCw,
   AlertCircle,
-  Megaphone
+  Megaphone,
+  Calendar
 } from "lucide-react";
 
 interface PendingLeaveItem {
@@ -60,6 +62,7 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isCircularModalOpen, setIsCircularModalOpen] = useState(false);
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
 
   const fetchHodAnalytics = async () => {
     try {
@@ -156,6 +159,14 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setIsRoutineModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900/80 hover:bg-slate-800 text-sky-300 border border-sky-500/30 shadow-md transition-all cursor-pointer"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Review Timetable Schedule</span>
+              </button>
+
               <button
                 onClick={() => setIsCircularModalOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-purple-600 hover:bg-purple-500 text-white shadow-md transition-all cursor-pointer"
@@ -350,6 +361,13 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
           isOpen={isCircularModalOpen}
           onClose={() => setIsCircularModalOpen(false)}
           authorRole="HOD"
+          department={user?.department || "Computer Science & Engineering"}
+        />
+
+        {/* Department Timetable Routine Modal */}
+        <DepartmentRoutineModal
+          isOpen={isRoutineModalOpen}
+          onClose={() => setIsRoutineModalOpen(false)}
           department={user?.department || "Computer Science & Engineering"}
         />
       </div>

@@ -19,6 +19,10 @@ export interface SerializedUser {
   role: UserRole;
   department: string;
   rollNumber: string;
+  semester?: number;
+  section?: string;
+  designation?: string;
+  onboarded?: boolean;
   profilePicture: string;
   createdAt?: string;
   updatedAt?: string;
@@ -114,6 +118,10 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       role: dbUser.role,
       department: dbUser.department || dynamicDepartment,
       rollNumber: dbUser.rollNumber || dynamicRoll,
+      semester: dbUser.semester || 1,
+      section: dbUser.section || "A",
+      designation: dbUser.designation || "",
+      onboarded: Boolean(dbUser.onboarded),
       profilePicture: dbUser.profilePicture || clerkUser.imageUrl || "",
       createdAt: dbUser.createdAt ? dbUser.createdAt.toISOString() : undefined,
       updatedAt: dbUser.updatedAt ? dbUser.updatedAt.toISOString() : undefined,
@@ -155,6 +163,10 @@ export async function updateUserRole(
       role: updatedUser.role,
       department: updatedUser.department,
       rollNumber: updatedUser.rollNumber || "",
+      semester: updatedUser.semester || 1,
+      section: updatedUser.section || "A",
+      designation: updatedUser.designation || "",
+      onboarded: Boolean(updatedUser.onboarded),
       profilePicture: updatedUser.profilePicture || "",
     };
   } catch (error) {
@@ -181,6 +193,10 @@ export async function getUserByClerkId(clerkId: string): Promise<SerializedUser 
       role: user.role,
       department: user.department,
       rollNumber: user.rollNumber || "",
+      semester: user.semester || 1,
+      section: user.section || "A",
+      designation: user.designation || "",
+      onboarded: Boolean(user.onboarded),
       profilePicture: user.profilePicture || "",
     };
   } catch (error) {
