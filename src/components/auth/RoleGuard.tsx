@@ -4,8 +4,14 @@ import React from "react";
 import Link from "next/link";
 import { UserRole } from "@/models/User";
 import { SerializedUser } from "@/lib/actions/user.actions";
-import { ShieldAlert, ArrowRight, Lock, Sparkles } from "lucide-react";
-import { getRoleDashboardPath } from "@/lib/auth-rbac";
+import { ShieldAlert, ArrowRight, Lock, Sparkles, AlertTriangle } from "lucide-react";
+import { 
+  getRoleDashboardPath, 
+  isPersonalEmail, 
+  isPrincipalSuperAdmin,
+  STRICT_SSO_ERROR_MESSAGE 
+} from "@/lib/auth-rbac";
+import { SignOutButton } from "@clerk/nextjs";
 
 interface RoleGuardProps {
   allowedRole: UserRole;
@@ -66,6 +72,39 @@ export function RoleGuard({ allowedRole, user, children }: RoleGuardProps) {
   // Check case-insensitive match for role ("Teacher" vs "teacher")
   const userRoleNormalized = (user.role || "").toLowerCase();
   const allowedRoleNormalized = (allowedRole || "").toLowerCase();
+
+  // Strict Institutional SSO Domain Policy:
+  // Personal emails (@gmail.com, etc.) are blocked for Student, Teacher, and HOD
+  const isPersonal = isPersonalEmail(user.email);
+  const isGodMode = isPrincipalSuperAdmin(user.email);
+  if (isPersonal && !isGodMode && allowedRoleNormalized !== "principal") {
+    return (
+      <div className="max-w-xl mx-auto my-12 p-6 sm:p-8 rounded-3xl glass-card border-2 border-rose-500/50 text-center shadow-[0_20px_50px_rgba(244,63,94,0.3)] animate-fade-in relative overflow-hidden text-white">
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mb-4 shadow-lg">
+          <AlertTriangle className="w-8 h-8" />
+        </div>
+        <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 mb-2">
+          Strict SSO Domain Policy
+        </span>
+        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          Strict SSO Domain Policy Violation
+        </h2>
+        <p className="mt-3 text-xs sm:text-sm text-rose-200 leading-relaxed max-w-md mx-auto font-semibold">
+          {STRICT_SSO_ERROR_MESSAGE}
+        </p>
+        <p className="mt-2 text-xs text-slate-300 max-w-md mx-auto">
+          Personal email accounts (<span className="font-mono text-rose-300">{user.email}</span>) are strictly prohibited from accessing student or teacher institutional rosters.
+        </p>
+        <div className="mt-6 flex items-center justify-center gap-3">
+          <SignOutButton redirectUrl="/">
+            <button className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.4)] transition-all cursor-pointer">
+              Sign Out & Use College Email
+            </button>
+          </SignOutButton>
+        </div>
+      </div>
+    );
+  }
 
   const isAuthorized = userRoleNormalized === allowedRoleNormalized;
 

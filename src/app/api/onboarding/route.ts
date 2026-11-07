@@ -7,7 +7,9 @@ import {
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
   getRoleDashboardPath,
-  isPrincipalSuperAdmin 
+  isPrincipalSuperAdmin,
+  isPersonalEmail,
+  STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
 
 export async function GET() {
@@ -21,13 +23,16 @@ export async function GET() {
 
     const email = clerkUser.emailAddresses?.[0]?.emailAddress || "";
     const isGodMode = isPrincipalSuperAdmin(email);
-    const validation = validateInstitutionalEmail(email);
-
     let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
+    const validation = validateInstitutionalEmail(
+      email,
+      (dbUser?.role as any) || (isGodMode ? "Principal" : undefined)
+    );
 
     return NextResponse.json({
       success: true,
       email,
+      isPersonal: isPersonalEmail(email),
       validation,
       onboarded: isGodMode || Boolean(dbUser?.onboarded),
       user: dbUser,
@@ -52,17 +57,6 @@ export async function POST(req: NextRequest) {
     }
 
     const email = clerkUser.emailAddresses?.[0]?.emailAddress || "";
-    const emailValidation = validateInstitutionalEmail(email);
-    if (!emailValidation.valid) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: emailValidation.error || "Personal email addresses are prohibited." 
-        },
-        { status: 403 }
-      );
-    }
-
     const body = await req.json();
     const {
       name,
@@ -78,16 +72,9 @@ export async function POST(req: NextRequest) {
       claimedFacultyName,
     } = body;
 
-    if (!department || !department.trim()) {
-      return NextResponse.json(
-        { success: false, error: "Academic Department is mandatory." },
-        { status: 400 }
-      );
-    }
-
-    // Determine final role
+    // Determine final role based on user selection or credentials
     let finalRole: UserRole = "Student";
-    if (requestedRole === "Principal") {
+    if (requestedRole === "Principal" || isPrincipalSuperAdmin(email)) {
       finalRole = "Principal";
     } else if (
       requestedRole === "HOD" ||
@@ -96,9 +83,31 @@ export async function POST(req: NextRequest) {
       finalRole = "HOD";
     } else if (requestedRole === "Teacher") {
       finalRole = "Teacher";
+    } else if (requestedRole === "Student") {
+      finalRole = "Student";
     } else {
-      // Check email derivation or default
       finalRole = deriveRoleFromEmail(email);
+    }
+
+    // Strict Role-Based Institutional Email Validation:
+    // Teachers and Students MUST use official college domains.
+    // Personal emails (@gmail.com, etc.) are allowed ONLY for Principal role.
+    const emailValidation = validateInstitutionalEmail(email, finalRole);
+    if (!emailValidation.valid) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: emailValidation.error || STRICT_SSO_ERROR_MESSAGE,
+        },
+        { status: 403 }
+      );
+    }
+
+    if (!department || !department.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Academic Department is mandatory." },
+        { status: 400 }
+      );
     }
 
     if (finalRole === "Student") {

@@ -41,7 +41,12 @@ function SignInContent() {
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Strict Educational Domain Policy</span>
           </div>
-          <span>Personal accounts (@gmail.com, @yahoo.com) are prohibited. Use your registered institutional email.</span>
+          <span className="font-medium text-white block">
+            Strict SSO: Please use your official college email ID provided by the institution.
+          </span>
+          <span className="block text-[10px] text-sky-300/80 mt-1">
+            (Personal emails permitted exclusively for Principal testing &amp; system management)
+          </span>
         </div>
 
         {/* Clerk Sign In Box */}

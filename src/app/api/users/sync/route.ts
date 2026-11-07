@@ -7,7 +7,8 @@ import {
   deriveRoleFromEmail, 
   deriveDepartment,
   deriveRollNumber,
-  getRoleDashboardPath 
+  getRoleDashboardPath,
+  STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
 
 export async function POST(req: NextRequest) {
@@ -68,28 +69,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Strict Institutional Email Validation (Reject @gmail.com, etc.)
-    const emailValidation = validateInstitutionalEmail(email);
+    // Check existing record first to respect role if onboarded
+    const existing = await User.findOne({ clerkId });
+    const claimedRole = bodyData.role || existing?.role;
+
+    // Strict Institutional Email Validation (Reject @gmail.com for Teachers/Students)
+    const emailValidation = validateInstitutionalEmail(email, claimedRole);
     if (!emailValidation.valid) {
       return NextResponse.json(
         {
           success: false,
-          error: emailValidation.error,
-          policy: "Official college accounts only. Consumer email domains are prohibited.",
+          error: emailValidation.error || STRICT_SSO_ERROR_MESSAGE,
+          policy: "Official college accounts only. Consumer email domains are prohibited for Student and Faculty roles.",
         },
         { status: 403 }
       );
     }
-
     // Dynamic role, department, and roll number derivation
     const autoAssignedRole: UserRole =
-      bodyData.role || emailValidation.role || deriveRoleFromEmail(email);
+      bodyData.role || (emailValidation.role as UserRole) || deriveRoleFromEmail(email);
     const department = deriveDepartment(email, metaDept);
     const rollNumber = deriveRollNumber(email, autoAssignedRole, metaRoll);
     const phone = bodyData.phone || "";
 
-    // Check if user has already onboarded to preserve their custom entries
-    const existing = await User.findOne({ clerkId });
     const finalDepartment = (existing?.onboarded && existing.department) ? existing.department : department;
     const finalRollNumber = (existing?.onboarded && existing.rollNumber) ? existing.rollNumber : rollNumber;
     const finalRole = (existing?.onboarded && existing.role) ? existing.role : autoAssignedRole;

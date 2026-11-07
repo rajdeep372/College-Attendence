@@ -16,7 +16,9 @@ import {
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
   getRoleDashboardPath,
-  isPrincipalSuperAdmin 
+  isPrincipalSuperAdmin,
+  isPersonalEmail,
+  STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 
@@ -31,16 +33,22 @@ export default async function HomePage() {
   // If already logged in, validate institutional email & auto-route immediately
   if (clerkUser) {
     const primaryEmail = clerkUser.emailAddresses?.[0]?.emailAddress || "";
+    const isPersonal = isPersonalEmail(primaryEmail);
+    const isSuperAdmin = isPrincipalSuperAdmin(primaryEmail);
 
-    // Supreme Principal God-Mode Super-Admin
-    if (isPrincipalSuperAdmin(primaryEmail)) {
+    // Supreme Principal God-Mode Super-Admin exception
+    if (isSuperAdmin) {
       redirect("/dashboard/principal");
     }
 
-    const validation = validateInstitutionalEmail(primaryEmail);
+    // Check if user has completed mandatory onboarding
+    const dbUser = await getCurrentUser();
+    if (!dbUser || !dbUser.onboarded) {
+      redirect("/onboarding");
+    }
 
-    if (!validation.valid) {
-      // Personal email detected: show strict access denial screen
+    // If user has personal email but was onboarded as Student/Teacher/HOD (not Principal):
+    if (isPersonal && dbUser.role !== "Principal") {
       return (
         <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-slate-950 text-slate-100">
           <div className="w-full max-w-lg p-6 sm:p-8 rounded-3xl glass-card border-2 border-rose-500/40 text-center shadow-[0_20px_50px_rgba(244,63,94,0.25)] relative overflow-hidden">
@@ -55,16 +63,19 @@ export default async function HomePage() {
             </span>
 
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-              Personal Email Restricted
+              Strict SSO Domain Policy Violation
             </h1>
 
-            <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
-              {validation.error || "Personal email addresses (@gmail.com, @yahoo.com, etc.) are strictly prohibited from accessing this institutional ledger."}
+            <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed font-semibold">
+              {STRICT_SSO_ERROR_MESSAGE}
             </p>
 
             <div className="mt-4 p-3 rounded-xl bg-slate-900/80 border border-white/5 text-left text-xs space-y-1">
               <div className="text-slate-400">Authenticated Account:</div>
               <div className="font-mono text-rose-300 font-bold truncate">{primaryEmail}</div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                Personal emails (@{primaryEmail.split("@")[1]}) are prohibited for students and teachers.
+              </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -77,12 +88,6 @@ export default async function HomePage() {
           </div>
         </div>
       );
-    }
-
-    // Check if user has completed mandatory onboarding
-    const dbUser = await getCurrentUser();
-    if (!dbUser || !dbUser.onboarded) {
-      redirect("/onboarding");
     }
 
     // Email is valid and user is onboarded -> redirect to their designated dashboard

@@ -32,29 +32,30 @@ export default clerkMiddleware(async (auth, req) => {
     // Never allow authenticated users to be randomly bounced to the landing page "/"
     if (session.userId) {
       const userRole =
-        (session.sessionClaims?.metadata as { role?: string })?.role?.toLowerCase() || "student";
+        (session.sessionClaims?.metadata as { role?: string })?.role?.toLowerCase();
 
-      if (path === "/" || path === "") {
-        const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      // Direct /dashboard or /dashboard/ visits to specific role portal
-      if (path === "/dashboard" || path === "/dashboard/") {
-        const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
-        return NextResponse.redirect(redirectUrl);
-      }
-
-      // Cross-role isolation: Student cannot access Teacher/HOD/Principal
-      if (path.startsWith("/dashboard/")) {
-        const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
-        if (
-          targetRole &&
-          ["principal", "hod", "teacher", "student"].includes(targetRole) &&
-          targetRole !== userRole
-        ) {
+      // If user hasn't set up role yet, allow direct access to onboarding
+      if (!userRole) {
+        if (path === "/" || path === "" || path === "/dashboard" || path === "/dashboard/") {
+          return NextResponse.redirect(new URL("/onboarding", req.url));
+        }
+      } else {
+        if (path === "/" || path === "" || path === "/dashboard" || path === "/dashboard/") {
           const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
           return NextResponse.redirect(redirectUrl);
+        }
+
+        // Cross-role isolation: prevent students/teachers from accessing higher role dashboards
+        if (path.startsWith("/dashboard/")) {
+          const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
+          if (
+            targetRole &&
+            ["principal", "hod", "teacher", "student"].includes(targetRole) &&
+            targetRole !== userRole
+          ) {
+            const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
+            return NextResponse.redirect(redirectUrl);
+          }
         }
       }
     } else {

@@ -5,11 +5,27 @@ export type InstitutionalRole = "Principal" | "HOD" | "Teacher" | "Student";
  */
 export const PRINCIPAL_SUPERADMIN_EMAIL = "chatterjeer477@gmail.com";
 
+/**
+ * Institutional SSO Error Message required across all interfaces
+ */
+export const STRICT_SSO_ERROR_MESSAGE =
+  "Strict SSO: Please use your official college email ID provided by the institution.";
+
 export function isPrincipalSuperAdmin(email?: string | null): boolean {
   if (!email) return false;
   const clean = email.toLowerCase().trim();
   const envSuperAdmin = (process.env.PRINCIPAL_SUPERADMIN_EMAIL || "").toLowerCase().trim();
-  return clean === PRINCIPAL_SUPERADMIN_EMAIL || (Boolean(envSuperAdmin) && clean === envSuperAdmin);
+  const envAdminEmails = (process.env.ADMIN_EMAILS || "")
+    .toLowerCase()
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+
+  return (
+    clean === PRINCIPAL_SUPERADMIN_EMAIL ||
+    (Boolean(envSuperAdmin) && clean === envSuperAdmin) ||
+    envAdminEmails.includes(clean)
+  );
 }
 
 export const DISALLOWED_EMAIL_DOMAINS = [
@@ -31,6 +47,16 @@ export const DISALLOWED_EMAIL_DOMAINS = [
   "gmx.com",
   "yandex.com",
 ];
+
+/**
+ * Checks if an email address belongs to a standard commercial/personal provider
+ */
+export function isPersonalEmail(email?: string | null): boolean {
+  if (!email || !email.includes("@")) return false;
+  const domain = email.toLowerCase().trim().split("@")[1];
+  if (!domain) return false;
+  return DISALLOWED_EMAIL_DOMAINS.includes(domain);
+}
 
 export const DEPARTMENT_DICTIONARY: Record<string, string> = {
   cse: "Computer Science & Engineering",
@@ -160,9 +186,15 @@ export function deriveRollNumber(
 
 /**
  * Validates whether an email belongs to an official educational institution.
- * Strictly rejects consumer/personal emails (like @gmail.com, @yahoo.com).
+ * - Supreme Principal God-Mode email is always authorized as Principal.
+ * - Standard personal emails (@gmail.com, @yahoo.com, etc.) are allowed ONLY if claiming or operating under the 'Principal' role (for admin testing/management).
+ * - Students, Teachers, and HODs MUST use an official institutional email; personal emails are strictly rejected with:
+ *   'Strict SSO: Please use your official college email ID provided by the institution.'
  */
-export function validateInstitutionalEmail(email?: string | null): EmailValidationResult {
+export function validateInstitutionalEmail(
+  email?: string | null,
+  requestedRole?: InstitutionalRole | string | null
+): EmailValidationResult {
   if (!email || !email.includes("@")) {
     return {
       valid: false,
@@ -181,7 +213,7 @@ export function validateInstitutionalEmail(email?: string | null): EmailValidati
     return { valid: false, error: "Incomplete email address." };
   }
 
-  // Supreme Principal God-Mode Super-Admin bypass
+  // 1. Supreme Principal God-Mode Super-Admin exception
   if (isPrincipalSuperAdmin(cleanEmail)) {
     return {
       valid: true,
@@ -193,17 +225,37 @@ export function validateInstitutionalEmail(email?: string | null): EmailValidati
     };
   }
 
-  // Reject personal / commercial email providers
-  if (DISALLOWED_EMAIL_DOMAINS.includes(domain)) {
+  const isPersonal = DISALLOWED_EMAIL_DOMAINS.includes(domain);
+  const normalizedRole = requestedRole
+    ? (requestedRole.trim() as InstitutionalRole)
+    : undefined;
+
+  // 2. Personal Email Handling:
+  // Standard personal emails (@gmail.com, etc.) allowed ONLY if claiming the 'Principal' role
+  if (isPersonal) {
+    if (normalizedRole === "Principal") {
+      return {
+        valid: true,
+        domain,
+        prefix,
+        role: "Principal",
+        department: "Office of the Principal & Institutional Affairs",
+        rollNumber: `ADM-PRIN-${new Date().getFullYear()}`,
+      };
+    }
+
+    // Teachers, HODs, and Students are strictly blocked with the exact error message
     return {
       valid: false,
       domain,
       prefix,
-      error: `Personal email accounts (@${domain}) are strictly prohibited. You must sign in using your official college credentials (e.g., rollnumber@college.edu or faculty@college.edu).`,
+      role: normalizedRole,
+      error: STRICT_SSO_ERROR_MESSAGE,
     };
   }
 
-  const role = deriveRoleFromEmail(cleanEmail);
+  // 3. Official college/institutional domain:
+  const role = normalizedRole || deriveRoleFromEmail(cleanEmail);
   const department = deriveDepartment(cleanEmail);
   const rollNumber = deriveRollNumber(cleanEmail, role);
 

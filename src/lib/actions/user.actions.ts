@@ -8,7 +8,8 @@ import {
   deriveRoleFromEmail,
   deriveDepartment,
   deriveRollNumber,
-  isPrincipalSuperAdmin
+  isPrincipalSuperAdmin,
+  isPersonalEmail 
 } from "@/lib/auth-rbac";
 
 export interface SerializedUser {
@@ -82,17 +83,26 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
     let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean<IUser>();
 
     const isGodMode = isPrincipalSuperAdmin(primaryEmail);
+    const isPersonal = isPersonalEmail(primaryEmail);
 
     // If user not in MongoDB yet, auto-provision with derived credentials
+    // Note: Personal emails are restricted to Principal role exclusively for testing/management
     if (!dbUser) {
+      const initialRole: UserRole = isGodMode || isPersonal ? "Principal" : derivedRole;
+      const initialDept = isGodMode
+        ? "Executive Institutional Leadership"
+        : isPersonal
+        ? "Office of the Principal & Institutional Affairs"
+        : dynamicDepartment;
+
       const newUser = await User.create({
         clerkId: clerkUser.id,
         name: isGodMode ? `${fullName} (Principal)` : fullName,
         email: primaryEmail.toLowerCase().trim(),
-        role: isGodMode ? "Principal" : derivedRole,
-        department: isGodMode ? "Executive Institutional Leadership" : dynamicDepartment,
-        rollNumber: isGodMode ? "ADM-PRIN-SUPERADMIN" : dynamicRoll,
-        designation: isGodMode ? "Supreme Principal Super-Admin" : "",
+        role: initialRole,
+        department: initialDept,
+        rollNumber: isGodMode ? "ADM-PRIN-SUPERADMIN" : isPersonal ? `ADM-PRIN-${new Date().getFullYear()}` : dynamicRoll,
+        designation: isGodMode ? "Supreme Principal Super-Admin" : isPersonal ? "Principal / Super-Admin" : "",
         onboarded: isGodMode ? true : false,
         profilePicture: clerkUser.imageUrl || "",
       });
@@ -119,7 +129,7 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
         updatePayload.department = metaDept;
         needsUpdate = true;
       }
-      if (!isGodMode && dbUser.role !== derivedRole && derivedRole !== "Student") {
+      if (!isGodMode && !isPersonal && !dbUser.onboarded && dbUser.role !== derivedRole && derivedRole !== "Student") {
         updatePayload.role = derivedRole;
         needsUpdate = true;
       }

@@ -18,8 +18,14 @@ import {
   BookOpen,
   UserCheck,
   Calendar,
-  Clock
+  Clock,
+  AlertTriangle
 } from "lucide-react";
+import { 
+  isPersonalEmail, 
+  isPrincipalSuperAdmin, 
+  STRICT_SSO_ERROR_MESSAGE 
+} from "@/lib/auth-rbac";
 
 export const DEPARTMENTS = [
   "Computer Science & Engineering (CSE)",
@@ -33,6 +39,7 @@ export const DEPARTMENTS = [
   "Civil Engineering (CE)",
   "Data Science & Analytics",
   "Cyber Security & Forensics",
+  "Office of the Principal & Institutional Affairs",
   "General Academic & Sciences",
 ];
 
@@ -84,23 +91,31 @@ interface UnclaimedProfile {
 export function OnboardingForm({
   initialEmail,
   initialName = "",
-  initialRole = "Student",
+  initialRole,
   initialDepartment = "Computer Science & Engineering (CSE)",
   initialRoll = "",
 }: OnboardingFormProps) {
   const router = useRouter();
 
-  const [role, setRole] = useState<"Student" | "Teacher" | "HOD">(
-    initialRole === "Principal" ? "Teacher" : initialRole === "HOD" ? "HOD" : initialRole
-  );
+  const isPersonal = isPersonalEmail(initialEmail) && !isPrincipalSuperAdmin(initialEmail);
+  const defaultRole: "Student" | "Teacher" | "HOD" | "Principal" =
+    initialRole || (isPersonal ? "Principal" : "Student");
+
+  const [role, setRole] = useState<"Student" | "Teacher" | "HOD" | "Principal">(defaultRole);
+  const isSsoBlocked = isPersonal && role !== "Principal";
+
   const [name, setName] = useState(initialName);
   const [rollNumber, setRollNumber] = useState(initialRoll);
-  const [department, setDepartment] = useState(initialDepartment);
+  const [department, setDepartment] = useState(
+    defaultRole === "Principal" ? "Office of the Principal & Institutional Affairs" : initialDepartment
+  );
   const [academicYear, setAcademicYear] = useState<string>("3rd Year");
   const [semester, setSemester] = useState<number>(5);
   const [section, setSection] = useState<string>("Section A");
   const [batchDuration, setBatchDuration] = useState<string>("2024-2028");
-  const [designation, setDesignation] = useState("Assistant Professor");
+  const [designation, setDesignation] = useState(
+    defaultRole === "Principal" ? "Principal / Super-Admin" : "Assistant Professor"
+  );
 
   // Faculty Routine Claiming state
   const [unclaimedSlots, setUnclaimedSlots] = useState<UnclaimedProfile[]>([]);
@@ -131,7 +146,7 @@ export function OnboardingForm({
 
   // Fetch unclaimed routine slots for teachers
   useEffect(() => {
-    if (role !== "Student" && department) {
+    if (role !== "Student" && role !== "Principal" && department) {
       setIsLoadingUnclaimed(true);
       fetch(`/api/routine/unclaimed?department=${encodeURIComponent(department)}`)
         .then((res) => res.json())
@@ -154,6 +169,12 @@ export function OnboardingForm({
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
+
+    // Strict Institutional SSO Gate
+    if (isSsoBlocked) {
+      setErrorMessage(STRICT_SSO_ERROR_MESSAGE);
+      return;
+    }
 
     if (role === "Student" && !rollNumber.trim()) {
       setErrorMessage("Roll Number is required to map you to your exact classroom roster.");
@@ -184,9 +205,9 @@ export function OnboardingForm({
           academicYear: role === "Student" ? academicYear : undefined,
           semester: role === "Student" ? Number(semester) : undefined,
           section: role === "Student" ? section : undefined,
-          rollNumber: role === "Student" ? rollNumber.trim().toUpperCase() : undefined,
-          designation: role !== "Student" ? designation : undefined,
-          claimedFacultyName: role !== "Student" && claimedFacultyName ? claimedFacultyName : undefined,
+          rollNumber: role === "Student" ? rollNumber.trim().toUpperCase() : (role === "Principal" ? "ADM-PRIN" : undefined),
+          designation: role === "Principal" ? "Principal / Super-Admin" : (role !== "Student" ? designation : undefined),
+          claimedFacultyName: (role === "Teacher" || role === "HOD") && claimedFacultyName ? claimedFacultyName : undefined,
         }),
       });
 
@@ -201,7 +222,7 @@ export function OnboardingForm({
       );
 
       setTimeout(() => {
-        const dest = data.targetDashboard || (role === "Student" ? "/dashboard/student" : "/dashboard/teacher");
+        const dest = data.targetDashboard || (role === "Student" ? "/dashboard/student" : role === "Principal" ? "/dashboard/principal" : "/dashboard/teacher");
         router.push(dest);
         router.refresh();
       }, 1200);
@@ -232,7 +253,48 @@ export function OnboardingForm({
         </p>
       </div>
 
-      {errorMessage && (
+      {/* Strict SSO Domain Restriction Alert */}
+      {isSsoBlocked && (
+        <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-rose-500/15 border-2 border-rose-500/50 text-rose-200 text-xs sm:text-sm flex items-start gap-3.5 shadow-[0_10px_35px_rgba(244,63,94,0.3)] animate-fade-in">
+          <AlertTriangle className="w-6 h-6 shrink-0 text-rose-400 mt-0.5" />
+          <div className="space-y-1.5 flex-1">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="font-extrabold text-rose-300 text-sm sm:text-base tracking-tight">
+                Institutional Domain Security Policy
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/30 border border-rose-500/40 text-rose-200 uppercase tracking-wider">
+                Access Prohibited
+              </span>
+            </div>
+            <p className="font-bold text-white text-xs sm:text-sm leading-relaxed">
+              Strict SSO: Please use your official college email ID provided by the institution.
+            </p>
+            <p className="text-[11px] text-slate-300 leading-normal">
+              Consumer accounts (<span className="font-mono text-rose-300 font-bold">{initialEmail}</span>) cannot be enrolled as a <strong>{role}</strong>. Faculty and students must authenticate via official institutional credentials.
+            </p>
+            <div className="pt-2 text-[11px] text-amber-300 flex items-center gap-1.5 font-medium border-t border-rose-500/20">
+              <School className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>To test or manage the system with this personal email, switch your role to <strong>Principal (Admin)</strong>.</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isPersonal && role === "Principal" && (
+        <div className="mb-6 p-4 rounded-2xl bg-sky-500/15 border border-sky-400/40 text-sky-200 text-xs sm:text-sm flex items-start gap-3 shadow animate-fade-in">
+          <ShieldCheck className="w-5 h-5 shrink-0 text-sky-400 mt-0.5" />
+          <div className="space-y-1">
+            <div className="font-bold text-white text-xs sm:text-sm">
+              Principal / Super-Admin Whitelist Active
+            </div>
+            <p className="text-[11px] text-sky-200/90 leading-normal">
+              Your personal email (<span className="font-mono text-sky-300 font-bold">{initialEmail}</span>) is authorized exclusively for institutional leadership, supervisor testing, timetable synchronization, and faculty roster oversight.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {errorMessage && !isSsoBlocked && (
         <div className="mb-6 p-4 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
           <AlertCircle className="w-5 h-5 shrink-0 text-rose-400" />
           <span>{errorMessage}</span>
@@ -264,44 +326,72 @@ export function OnboardingForm({
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1.5">
-              College Email (Verified)
+            <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+              <span>Authenticated Email</span>
+              {isPersonal && (
+                <span className="text-[10px] text-amber-400 font-mono">Personal Email</span>
+              )}
             </label>
             <input
               type="email"
               disabled
               value={initialEmail}
-              className="w-full px-4 py-3 rounded-xl bg-slate-900/60 border border-white/5 text-slate-400 text-xs sm:text-sm cursor-not-allowed font-mono"
+              className={`w-full px-4 py-3 rounded-xl border text-xs sm:text-sm cursor-not-allowed font-mono ${
+                isPersonal
+                  ? "bg-slate-900/80 border-amber-500/30 text-amber-300"
+                  : "bg-slate-900/60 border-white/5 text-slate-400"
+              }`}
             />
           </div>
         </div>
 
         {/* Institutional Role Selector */}
         <div>
-          <label className="block text-slate-300 font-semibold mb-1.5">
-            Institutional Role
+          <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+            <span>Institutional Role</span>
+            {isPersonal && (
+              <span className="text-[10px] text-amber-400 font-medium">
+                Personal email allowed for Principal only
+              </span>
+            )}
           </label>
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             {[
               { id: "Student", label: "Student", icon: GraduationCap },
               { id: "Teacher", label: "Faculty / Teacher", icon: Briefcase },
               { id: "HOD", label: "Head of Dept (HOD)", icon: ShieldCheck },
+              { id: "Principal", label: "Principal (Admin)", icon: School },
             ].map((r) => {
               const Icon = r.icon;
               const isSelected = role === r.id;
+              const isBlocked = isPersonal && r.id !== "Principal";
               return (
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => setRole(r.id as any)}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 font-semibold transition-all cursor-pointer pointer-events-auto ${
+                  onClick={() => {
+                    setRole(r.id as any);
+                    if (isPersonal && r.id !== "Principal") {
+                      setErrorMessage(STRICT_SSO_ERROR_MESSAGE);
+                    } else {
+                      setErrorMessage(null);
+                    }
+                  }}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 font-semibold transition-all cursor-pointer pointer-events-auto relative ${
                     isSelected
-                      ? "bg-sky-500/20 border-sky-400 text-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
+                      ? isBlocked
+                        ? "bg-rose-500/20 border-rose-500 text-rose-200 shadow-[0_0_20px_rgba(244,63,94,0.3)]"
+                        : "bg-sky-500/20 border-sky-400 text-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
+                      : isBlocked
+                      ? "bg-slate-950/60 border-rose-500/20 text-rose-400/70 hover:text-rose-300 hover:border-rose-500/40"
                       : "bg-slate-950/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-900"
                   }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span className="text-xs text-center">{r.label}</span>
+                  {isBlocked && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-950" />
+                  )}
                 </button>
               );
             })}
@@ -447,7 +537,7 @@ export function OnboardingForm({
         {/* ============================================================== */}
         {/* TEACHER / HOD CONDITIONAL FIELDS & ROUTINE CLAIMING            */}
         {/* ============================================================== */}
-        {role !== "Student" && (
+        {(role === "Teacher" || role === "HOD") && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -505,21 +595,52 @@ export function OnboardingForm({
           </motion.div>
         )}
 
+        {/* ============================================================== */}
+        {/* PRINCIPAL CONDITIONAL FIELDS & SUPERVISION SCOPE              */}
+        {/* ============================================================== */}
+        {role === "Principal" && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="space-y-4 pt-3 border-t border-white/10"
+          >
+            <div className="p-4 rounded-2xl bg-sky-950/60 border border-sky-400/30 space-y-2 text-slate-200">
+              <div className="flex items-center gap-2 text-sky-300 font-bold text-xs">
+                <School className="w-4 h-4 text-sky-400" />
+                <span>Supreme Executive Authority & Administrative Testing</span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                As Principal, you have unrestricted cross-departmental oversight. You can inspect all student attendance rates, monitor teacher lecture progress, operate as any HOD to upload timetables, and authorize institutional leaves.
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Submit Button */}
         <div className="pt-4">
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3.5 px-6 rounded-xl font-bold text-white bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_30px_rgba(56,189,248,0.4)] transition-all cursor-pointer pointer-events-auto flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={isSubmitting || isSsoBlocked}
+            className={`w-full py-3.5 px-6 rounded-xl font-bold text-white transition-all flex items-center justify-center gap-2 ${
+              isSsoBlocked
+                ? "bg-slate-900 border-2 border-rose-500/40 text-rose-300/80 cursor-not-allowed shadow-none"
+                : "bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_30px_rgba(56,189,248,0.4)] cursor-pointer pointer-events-auto"
+            }`}
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Registering Profile...</span>
               </>
+            ) : isSsoBlocked ? (
+              <>
+                <AlertTriangle className="w-5 h-5 text-rose-400" />
+                <span>Strict SSO: College Email Required for {role}</span>
+              </>
             ) : (
               <>
-                <span>Complete Institutional Setup</span>
+                <span>Complete Institutional Setup ({role})</span>
                 <ArrowRight className="w-5 h-5" />
               </>
             )}

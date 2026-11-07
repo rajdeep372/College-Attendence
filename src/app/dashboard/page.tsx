@@ -6,7 +6,9 @@ import { useUser } from "@clerk/nextjs";
 import { 
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
-  getRoleDashboardPath 
+  getRoleDashboardPath,
+  isPrincipalSuperAdmin,
+  isPersonalEmail 
 } from "@/lib/auth-rbac";
 import { RefreshCw, ShieldCheck } from "lucide-react";
 
@@ -23,10 +25,11 @@ function DashboardAutoRouter() {
     }
 
     const email = user.primaryEmailAddress?.emailAddress || "";
-    const validation = validateInstitutionalEmail(email);
+    const isSuperAdmin = isPrincipalSuperAdmin(email);
+    const isPersonal = isPersonalEmail(email);
 
-    if (!validation.valid) {
-      router.replace("/");
+    if (isSuperAdmin) {
+      router.replace("/dashboard/principal");
       return;
     }
 
@@ -37,16 +40,18 @@ function DashboardAutoRouter() {
         const data = await res.json();
 
         if (data.success && data.onboarded) {
-          const role = data.user?.role || validation.role || deriveRoleFromEmail(email);
+          const role = data.user?.role || (isPersonal ? "Principal" : "Student");
+          if (isPersonal && role !== "Principal") {
+            router.replace("/onboarding");
+            return;
+          }
           const targetPath = getRoleDashboardPath(role);
           router.replace(targetPath);
         } else {
           router.replace("/onboarding");
         }
       } catch {
-        // Fallback to role dashboard
-        const role = validation.role || deriveRoleFromEmail(email);
-        router.replace(getRoleDashboardPath(role));
+        router.replace("/onboarding");
       }
     }
 

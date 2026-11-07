@@ -41,7 +41,12 @@ function SignUpContent() {
             <ShieldCheck className="w-3.5 h-3.5" />
             <span>Strict Institutional Credential Registration</span>
           </div>
-          <span>Must use official institution email domain. Personal email accounts are rejected.</span>
+          <span className="font-medium text-white block">
+            Strict SSO: Please use your official college email ID provided by the institution.
+          </span>
+          <span className="block text-[10px] text-sky-300/80 mt-1">
+            (Personal emails permitted exclusively for Principal testing &amp; system management)
+          </span>
         </div>
 
         {/* Clerk SignUp */}
