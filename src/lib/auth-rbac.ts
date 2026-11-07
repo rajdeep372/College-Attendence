@@ -123,3 +123,4 @@ export function getRoleDashboardPath(role: InstitutionalRole | string): string {
       return "/dashboard/student";
   }
 }
+
