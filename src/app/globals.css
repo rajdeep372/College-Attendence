@@ -1,26 +1,243 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 214 32% 91%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 199 89% 48%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    --radius: 1rem;
+
+    /* Glass tokens light mode */
+    --glass-bg: rgba(255, 255, 255, 0.65);
+    --glass-border: rgba(59, 130, 246, 0.18);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+    --glass-highlight: rgba(255, 255, 255, 0.85);
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 210 40% 98%;
+    --card: 224 71% 4%;
+    --card-foreground: 210 40% 98%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 199 89% 48%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 224 76% 48%;
+
+    /* Glass tokens dark mode */
+    --glass-bg: rgba(15, 23, 42, 0.62);
+    --glass-border: rgba(56, 189, 248, 0.16);
+    --glass-shadow: 0 12px 40px -10px rgba(2, 132, 199, 0.25);
+    --glass-highlight: rgba(255, 255, 255, 0.15);
   }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #030712;
+  color: #f8fafc;
+  font-feature-settings: "rlig" 1, "calt" 1;
+  overflow-x: hidden;
+}
+
+/* 3D Glassmorphism core styles */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  );
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 10px 35px -5px rgba(0, 0, 0, 0.3),
+    0 0 20px -2px rgba(56, 189, 248, 0.12);
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .glass-card {
+  background: linear-gradient(
+    135deg,
+    rgba(15, 23, 42, 0.75) 0%,
+    rgba(2, 6, 23, 0.85) 100%
+  );
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  box-shadow: 
+    0 10px 35px -5px rgba(0, 0, 0, 0.5),
+    0 0 25px -3px rgba(37, 99, 235, 0.25);
+}
+
+.glass-card-interactive {
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+}
+
+.glass-card-interactive:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 
+    0 20px 45px -10px rgba(0, 0, 0, 0.6),
+    0 0 35px 2px rgba(56, 189, 248, 0.35);
+}
+
+/* 3D Specular Highlight reflection */
+.glass-specular {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-specular::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  transform: skewX(-25deg);
+  transition: left 0.75s ease;
+  pointer-events: none;
+}
+
+.glass-specular:hover::before {
+  left: 200%;
+}
+
+/* Neon Glow Accents */
+.neon-glow-blue {
+  box-shadow: 0 0 25px rgba(37, 99, 235, 0.45), inset 0 0 15px rgba(56, 189, 248, 0.2);
+}
+
+.neon-glow-cyan {
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.4), inset 0 0 10px rgba(6, 182, 212, 0.25);
+}
+
+.neon-text-glow {
+  text-shadow: 0 0 20px rgba(56, 189, 248, 0.6), 0 0 40px rgba(37, 99, 235, 0.3);
+}
+
+/* Ambient Animated Aurora Background */
+.aurora-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 10%, #0c1a3b 0%, #030712 60%);
+}
+
+.aurora-orb-1 {
+  position: absolute;
+  top: 5%;
+  left: 20%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, rgba(37, 99, 235, 0.08) 50%, transparent 70%);
+  filter: blur(70px);
+  border-radius: 50%;
+  animation: floatOrb 18s ease-in-out infinite alternate;
+}
+
+.aurora-orb-2 {
+  position: absolute;
+  top: 35%;
+  right: 15%;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, rgba(2, 132, 199, 0.08) 50%, transparent 70%);
+  filter: blur(80px);
+  border-radius: 50%;
+  animation: floatOrb 22s ease-in-out infinite alternate-reverse;
+}
+
+.aurora-orb-3 {
+  position: absolute;
+  bottom: 5%;
+  left: 30%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(30, 27, 75, 0.1) 60%, transparent 75%);
+  filter: blur(75px);
+  border-radius: 50%;
+  animation: floatOrb 25s ease-in-out infinite alternate;
+}
+
+@keyframes floatOrb {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(40px, -35px) scale(1.08);
+  }
+  100% {
+    transform: translate(-30px, 45px) scale(0.95);
+  }
+}
+
+/* Subtle Grid Texture for Depth */
+.bg-grid-tech {
+  background-image: 
+    radial-gradient(rgba(56, 189, 248, 0.12) 1px, transparent 1px),
+    radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px, 8px 8px;
+  background-position: 0 0, 16px 16px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(3, 7, 18, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.5);
 }

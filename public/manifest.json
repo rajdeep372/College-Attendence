@@ -1,0 +1,70 @@
+{
+  "id": "/?source=pwa",
+  "name": "AcademiaSync - Smart College Management & Attendance",
+  "short_name": "AcademiaSync",
+  "description": "Next-Gen 3D Glassmorphic College Management and Smart Attendance Web App with Anti-Proxy Geofencing and AI Schedule Extraction",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#030712",
+  "theme_color": "#0284c7",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity", "utilities"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/maskable-icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Teacher Attendance Console",
+      "short_name": "Attendance",
+      "url": "/dashboard/teacher",
+      "description": "Fast Absent-First roll call & Dynamic QR station",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Student Geofence Check-In",
+      "short_name": "Check-In",
+      "url": "/dashboard/student",
+      "description": "Enter 4-digit TOTP with GPS geofence verification",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "HOD AI Routine Parser",
+      "short_name": "AI Routine",
+      "url": "/dashboard/hod",
+      "description": "Upload routine image for Gemini AI schedule extraction",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Principal Command Center",
+      "short_name": "Institutional",
+      "url": "/dashboard/principal",
+      "description": "Campus-wide attendance pulse & automated notices",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    }
+  ]
+}
