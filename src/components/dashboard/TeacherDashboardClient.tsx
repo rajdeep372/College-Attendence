@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SerializedUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
 import { AbsentFirstGridView } from "@/components/attendance/AbsentFirstGridView";
+import { ParentAdvisoryModal } from "@/components/modals/ParentAdvisoryModal";
 import { 
   QrCode, 
   MapPin, 
@@ -15,17 +16,68 @@ import {
   Sparkles,
   Smartphone,
   CheckCheck,
-  RefreshCw
+  RefreshCw,
+  Send
 } from "lucide-react";
+
+interface TodayClass {
+  _id: string;
+  code: string;
+  title: string;
+  time: string;
+  hall: string;
+  status: string;
+  attendance: string;
+}
+
+interface DefaulterStudent {
+  name: string;
+  roll: string;
+  email?: string;
+  percentage: string;
+  absences: number;
+}
+
+interface TeacherAnalytics {
+  todayClasses: TodayClass[];
+  defaulters: DefaulterStudent[];
+  attendanceLogsCount: number;
+}
 
 export function TeacherDashboardClient({ user }: { user: SerializedUser | null }) {
   const [isQrActive, setIsQrActive] = useState(false);
-  const [attendanceCount, setAttendanceCount] = useState(58);
-  const [tokenCounter, setTokenCounter] = useState(14);
   const [totpPin, setTotpPin] = useState("8421");
-  const totalStudents = 64;
+  const [isAdvisoryModalOpen, setIsAdvisoryModalOpen] = useState(false);
+  const [analytics, setAnalytics] = useState<TeacherAnalytics | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  React.useEffect(() => {
+  // Fetch real Teacher analytics from MongoDB
+  const fetchTeacherAnalytics = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams({
+        role: "Teacher",
+        userId: user?._id || "",
+        department: user?.department || "",
+      });
+      const res = await fetch(`/api/analytics?${params.toString()}`);
+      const data = await res.json();
+      if (data.success && data.analytics) {
+        setAnalytics(data.analytics);
+      }
+    } catch (err) {
+      console.error("Failed to load teacher analytics:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTeacherAnalytics();
+  }, [user]);
+
+  // Fetch rotating TOTP
+  useEffect(() => {
     async function fetchTotp() {
       try {
         const res = await fetch("/api/attendance/totp");
@@ -34,7 +86,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
           setTotpPin(data.code);
         }
       } catch {
-        // Fallback to default
+        // Fallback
       }
     }
     fetchTotp();
@@ -42,21 +94,23 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
     return () => clearInterval(interval);
   }, []);
 
-  const todayClasses = [
-    { code: "CS-502", title: "Distributed Systems & Cloud", time: "10:00 AM - 11:00 AM", hall: "Lab 3B", status: "Completed", attendance: "61 / 64 (95.3%)" },
-    { code: "CS-504", title: "Database Architecture", time: "11:30 AM - 12:30 PM", hall: "Seminar Room 1", status: "Live Now", attendance: `${attendanceCount} / 64 (${Math.round((attendanceCount / 64) * 100)}%)` },
-    { code: "CS-508", title: "Compiler Design Lab", time: "02:00 PM - 04:00 PM", hall: "Systems Lab A", status: "Upcoming", attendance: "Pending" },
+  const todayClasses = analytics?.todayClasses || [
+    {
+      _id: "demo-1",
+      code: "CS-504",
+      title: "Database Management Systems",
+      time: "11:30 AM - 12:30 PM",
+      hall: "Lecture Hall CS-301",
+      status: "Live Now",
+      attendance: "Roster Active",
+    },
   ];
 
-  const defaulterList = [
-    { name: "Vikram Malhotra", roll: "22CS089", percentage: "64.2%", absences: 9 },
-    { name: "Pooja Hegde", roll: "22CS034", percentage: "68.5%", absences: 8 },
-    { name: "Rohan Verma", roll: "22CS102", percentage: "71.0%", absences: 7 },
-  ];
+  const defaulterList = analytics?.defaulters || [];
 
   return (
     <RoleGuard allowedRole="Teacher" user={user}>
-      <div className="space-y-8 animate-fade-in">
+      <div className="space-y-8 animate-fade-in relative">
         {/* User Profile Card from MongoDB */}
         <UserProfileCard user={user} defaultRole="Teacher" />
 
@@ -113,29 +167,28 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
               <div className="flex-1 space-y-4">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
                   <MapPin className="w-3.5 h-3.5" />
-                  <span>Geofencing Active &bull; Hall CS-301 Radius: 50m</span>
+                  <span>Geofencing Active &bull; Campus Boundary Radius: 50m</span>
                 </div>
                 <h3 className="text-xl font-bold text-white">
-                  Live Attendance Conduction &bull; CS-504
+                  Live Attendance Conduction &bull; Dynamic TOTP Projection
                 </h3>
                 <p className="text-sm text-slate-300">
-                  Students must scan this code using their installed AcademiaSync PWA inside the physical lecture hall.
+                  Students enter this rolling 4-digit PIN on their installed AcademiaSync mobile PWA. The system cryptographically confirms coordinates are inside the physical perimeter before logging attendance.
                 </p>
 
                 <div className="p-4 rounded-xl bg-slate-950/60 border border-white/10 flex items-center justify-between">
                   <div>
-                    <div className="text-2xl font-black text-emerald-400">
-                      {attendanceCount} / {totalStudents}
+                    <div className="text-xs text-slate-400">Security Verification Status</div>
+                    <div className="text-sm font-semibold text-emerald-400 mt-0.5">
+                      Encrypted Rolling Nonce & Geofence Validated
                     </div>
-                    <div className="text-xs text-slate-400">Marked Present in Real-Time</div>
                   </div>
 
                   <button
-                    onClick={() => setAttendanceCount((prev) => Math.min(prev + 1, totalStudents))}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-sky-600 hover:bg-sky-500 text-white shadow-md cursor-pointer flex items-center gap-1.5"
+                    onClick={() => setIsQrActive(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer"
                   >
-                    <CheckCheck className="w-3.5 h-3.5" />
-                    <span>Simulate Student Check-In</span>
+                    Minimize
                   </button>
                 </div>
               </div>
@@ -143,7 +196,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
           </div>
         )}
 
-        {/* Absent-First Fast Attendance Station */}
+        {/* Absent-First Fast Attendance Station (Live MongoDB connected) */}
         <AbsentFirstGridView />
 
         {/* Grid: Schedule & Defaulter Warnings */}
@@ -152,15 +205,21 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h3 className="text-lg font-bold text-white">Today&apos;s Lecture Schedule</h3>
-                <p className="text-xs text-slate-400">Assigned courses and live student turnout</p>
+                <p className="text-xs text-slate-400">Assigned courses loaded live from MongoDB Routine records</p>
               </div>
-              <Clock className="w-5 h-5 text-sky-400" />
+              <button
+                onClick={fetchTeacherAnalytics}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition-all cursor-pointer"
+                title="Refresh Schedule"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+              </button>
             </div>
 
             <div className="space-y-4">
               {todayClasses.map((cls, idx) => (
                 <div
-                  key={idx}
+                  key={cls._id || idx}
                   className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                 >
                   <div>
@@ -198,6 +257,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             </div>
           </div>
 
+          {/* Defaulter Alerts */}
           <div className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-4">
@@ -205,36 +265,53 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                 <h3 className="text-lg font-bold text-white">Attendance Defaulter Alerts</h3>
               </div>
               <p className="text-xs text-slate-400 mb-4">
-                Students requiring warning notices (&lt;75% attendance threshold):
+                Enrolled students requiring warning notices (&lt;75% attendance threshold):
               </p>
 
               <div className="space-y-3">
-                {defaulterList.map((st, i) => (
-                  <div
-                    key={i}
-                    className="p-3 rounded-xl bg-slate-900/70 border border-rose-500/20 flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="text-xs font-bold text-white">{st.name}</div>
-                      <div className="text-[11px] text-slate-400">{st.roll} &bull; {st.absences} Absences</div>
+                {defaulterList.length > 0 ? (
+                  defaulterList.map((st, i) => (
+                    <div
+                      key={i}
+                      className="p-3 rounded-xl bg-slate-900/70 border border-rose-500/20 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="text-xs font-bold text-white">{st.name}</div>
+                        <div className="text-[11px] text-slate-400">{st.roll} &bull; {st.absences} Absences</div>
+                      </div>
+                      <span className="px-2 py-1 rounded-lg text-xs font-extrabold text-rose-300 bg-rose-950/60 border border-rose-500/30">
+                        {st.percentage}
+                      </span>
                     </div>
-                    <span className="px-2 py-1 rounded-lg text-xs font-extrabold text-rose-300 bg-rose-950/60 border border-rose-500/30">
-                      {st.percentage}
-                    </span>
+                  ))
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-900/50 border border-white/5 text-xs text-slate-400 text-center">
+                    No chronic defaulters recorded for today&apos;s lectures.
                   </div>
-                ))}
+                )}
               </div>
             </div>
 
             <div className="mt-6 pt-4 border-t border-white/10">
-              <button className="w-full py-2.5 rounded-xl text-xs font-semibold bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/30 text-rose-300 transition-all cursor-pointer">
-                Dispatch Parent Advisory Notice
+              <button
+                onClick={() => setIsAdvisoryModalOpen(true)}
+                className="w-full py-2.5 rounded-xl text-xs font-semibold bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/30 text-rose-300 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Dispatch Parent Advisory Notice</span>
               </button>
             </div>
           </div>
         </div>
+
+        {/* Parent Advisory Modal */}
+        <ParentAdvisoryModal
+          isOpen={isAdvisoryModalOpen}
+          onClose={() => setIsAdvisoryModalOpen(false)}
+          department={user?.department || "Computer Science & Engineering"}
+          defaulters={defaulterList}
+        />
       </div>
     </RoleGuard>
   );
 }
-

@@ -8,7 +8,8 @@ export interface IUser extends Document {
   email: string;
   phone?: string;
   role: UserRole;
-  department?: string;
+  department: string;
+  rollNumber?: string;
   profilePicture?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -53,7 +54,14 @@ const UserSchema = new Schema<IUser>(
     department: {
       type: String,
       trim: true,
-      default: "Computer Science",
+      default: "General Academic & Sciences",
+      index: true,
+    },
+    rollNumber: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
     },
     profilePicture: {
       type: String,
@@ -71,4 +79,3 @@ const User: Model<IUser> =
   mongoose.model<IUser>("User", UserSchema);
 
 export default User;
-

@@ -5,15 +5,15 @@ import { currentUser } from "@clerk/nextjs/server";
 import { 
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
+  deriveDepartment,
+  deriveRollNumber,
   getRoleDashboardPath 
 } from "@/lib/auth-rbac";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Establish database connection
     await connectToDatabase();
 
-    // 2. Parse request body if provided
     let bodyData: {
       clerkId?: string;
       name?: string;
@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       phone?: string;
       role?: UserRole;
       department?: string;
+      rollNumber?: string;
       profilePicture?: string;
     } = {};
 
@@ -30,11 +31,12 @@ export async function POST(req: NextRequest) {
       // Body may be empty if frontend triggers auto-sync from Clerk session
     }
 
-    // 3. Check for Clerk session if fields not explicitly provided in body
     let clerkId = bodyData.clerkId;
     let name = bodyData.name;
     let email = bodyData.email;
     let profilePicture = bodyData.profilePicture;
+    let metaDept = bodyData.department;
+    let metaRoll = bodyData.rollNumber;
 
     if (!clerkId || !email) {
       try {
@@ -48,13 +50,14 @@ export async function POST(req: NextRequest) {
             "Academic User";
           email = email || clerkUser.emailAddresses?.[0]?.emailAddress;
           profilePicture = profilePicture || clerkUser.imageUrl;
+          metaDept = metaDept || (clerkUser.publicMetadata as { department?: string })?.department;
+          metaRoll = metaRoll || (clerkUser.publicMetadata as { rollNumber?: string })?.rollNumber;
         }
       } catch (err) {
         console.warn("[Sync] Clerk currentUser retrieval note:", err);
       }
     }
 
-    // 4. Validate essential attributes
     if (!clerkId || !email) {
       return NextResponse.json(
         {
@@ -65,7 +68,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Strict Institutional Email Validation (Reject @gmail.com, etc.)
+    // Strict Institutional Email Validation (Reject @gmail.com, etc.)
     const emailValidation = validateInstitutionalEmail(email);
     if (!emailValidation.valid) {
       return NextResponse.json(
@@ -78,15 +81,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 6. Smart Auto-Assignment (Zero Onboarding):
-    // Digits in email prefix -> Student; Names -> Teacher / HOD / Principal
+    // Dynamic role, department, and roll number derivation
     const autoAssignedRole: UserRole =
-      emailValidation.role || deriveRoleFromEmail(email);
-
-    const department = bodyData.department || "Computer Science";
+      bodyData.role || emailValidation.role || deriveRoleFromEmail(email);
+    const department = deriveDepartment(email, metaDept);
+    const rollNumber = deriveRollNumber(email, autoAssignedRole, metaRoll);
     const phone = bodyData.phone || "";
 
-    // 7. Upsert User in MongoDB
+    // Upsert User in MongoDB with exact institutional credentials
     const syncedUser = await User.findOneAndUpdate(
       { clerkId },
       {
@@ -96,6 +98,7 @@ export async function POST(req: NextRequest) {
         phone,
         role: autoAssignedRole,
         department,
+        rollNumber,
         profilePicture: profilePicture || "",
       },
       {
@@ -108,8 +111,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: "Clerk user synchronized with auto-assigned institutional role",
+        message: "Clerk user synchronized with auto-assigned institutional role and department",
         role: autoAssignedRole,
+        department,
+        rollNumber,
         redirectPath: getRoleDashboardPath(autoAssignedRole),
         user: syncedUser,
       },
@@ -137,6 +142,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const clerkId = searchParams.get("clerkId");
     const role = searchParams.get("role");
+    const department = searchParams.get("department");
 
     if (clerkId) {
       const user = await User.findOne({ clerkId });
@@ -151,8 +157,9 @@ export async function GET(req: NextRequest) {
 
     const filter: Record<string, unknown> = {};
     if (role) filter.role = role;
+    if (department) filter.department = department;
 
-    const users = await User.find(filter).sort({ createdAt: -1 }).limit(50);
+    const users = await User.find(filter).sort({ createdAt: -1 }).limit(100);
 
     return NextResponse.json({
       success: true,

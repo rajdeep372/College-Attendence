@@ -15,7 +15,7 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
   const role = user?.role || defaultRole;
   const name = user?.name || `Academic ${defaultRole}`;
   const email = user?.email || "academic@college.edu";
-  const department = user?.department || "Computer Science & Engineering";
+  const department = user?.department || "General Academic & Sciences";
   const profilePicture = user?.profilePicture;
 
   const roleColors: Record<UserRole, { badge: string; glow: string }> = {

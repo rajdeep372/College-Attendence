@@ -20,12 +20,130 @@ export const DISALLOWED_EMAIL_DOMAINS = [
   "yandex.com",
 ];
 
+export const DEPARTMENT_DICTIONARY: Record<string, string> = {
+  cse: "Computer Science & Engineering",
+  cs: "Computer Science & Engineering",
+  comp: "Computer Science & Engineering",
+  it: "Information Technology",
+  infotech: "Information Technology",
+  ece: "Electronics & Communication Engineering",
+  ec: "Electronics & Communication Engineering",
+  etce: "Electronics & Telecommunication Engineering",
+  ee: "Electrical & Electronics Engineering",
+  eee: "Electrical & Electronics Engineering",
+  me: "Mechanical Engineering",
+  mech: "Mechanical Engineering",
+  mechanical: "Mechanical Engineering",
+  ce: "Civil Engineering",
+  civil: "Civil Engineering",
+  aiml: "Artificial Intelligence & Machine Learning",
+  ai: "Artificial Intelligence & Machine Learning",
+  ds: "Data Science & Analytics",
+  aids: "AI & Data Science",
+  bba: "Management Studies",
+  mba: "Business Administration",
+  mgmt: "Management Studies",
+  phy: "Physics & Applied Sciences",
+  chem: "Chemistry & Materials Science",
+  math: "Mathematics & Computing",
+  admin: "College Administration",
+};
+
 export interface EmailValidationResult {
   valid: boolean;
   error?: string;
   domain?: string;
   prefix?: string;
   role?: InstitutionalRole;
+  department?: string;
+  rollNumber?: string;
+}
+
+/**
+ * Dynamically derives department from email prefix, domain, or metadata.
+ * Never defaults blindly to 'Computer Science'.
+ */
+export function deriveDepartment(
+  email: string,
+  metadataDept?: string | null
+): string {
+  // 1. If explicitly set in Clerk public metadata, respect it
+  if (metadataDept && metadataDept.trim()) {
+    return metadataDept.trim();
+  }
+
+  const clean = (email || "").toLowerCase().trim();
+  const prefix = clean.split("@")[0] || "";
+
+  // Split prefix by common delimiters (dots, underscores, hyphens, numbers)
+  const tokens = prefix.split(/[._\-\d]+/);
+
+  for (const token of tokens) {
+    if (token && DEPARTMENT_DICTIONARY[token]) {
+      return DEPARTMENT_DICTIONARY[token];
+    }
+  }
+
+  // Check substring matches
+  for (const [key, deptName] of Object.entries(DEPARTMENT_DICTIONARY)) {
+    // Only match if token is bounded or distinct
+    const regex = new RegExp(`(^|[._\\-\\d])${key}([._\\-\\d]|$)`, "i");
+    if (regex.test(prefix)) {
+      return deptName;
+    }
+  }
+
+  // If email belongs to executive office
+  if (prefix.includes("principal") || prefix.includes("dean") || prefix.includes("director")) {
+    return "Office of the Principal & Institutional Affairs";
+  }
+
+  return "General Academic & Sciences";
+}
+
+/**
+ * Dynamically derives student roll number or faculty ID from email and metadata
+ */
+export function deriveRollNumber(
+  email: string,
+  role: InstitutionalRole,
+  metadataRoll?: string | null
+): string {
+  if (metadataRoll && metadataRoll.trim()) {
+    return metadataRoll.trim().toUpperCase();
+  }
+
+  const clean = (email || "").toLowerCase().trim();
+  const prefix = clean.split("@")[0] || "";
+
+  if (role === "Student") {
+    // Detect year + department + serial patterns, e.g., 2023cs001, 22.cse.042, 21bcs09
+    const match = prefix.match(/(\d{2,4})[._\-]?([a-z]{2,4})[._\-]?(\d{1,4})/i);
+    if (match) {
+      const year = match[1].length === 2 ? `20${match[1]}` : match[1];
+      const dept = match[2].toUpperCase();
+      const num = match[3].padStart(3, "0");
+      return `${year}-${dept}-${num}`;
+    }
+
+    const simpleDigits = prefix.match(/\d+/g);
+    if (simpleDigits && simpleDigits.length > 0) {
+      const numStr = simpleDigits.join("");
+      return `STU-${numStr.slice(0, 8)}`;
+    }
+
+    return `STU-${Math.floor(1000 + Math.random() * 9000)}`;
+  }
+
+  if (role === "Teacher") {
+    return `FAC-${prefix.slice(0, 4).toUpperCase()}-${Math.floor(100 + Math.random() * 900)}`;
+  }
+
+  if (role === "HOD") {
+    return `HOD-${prefix.slice(0, 4).toUpperCase()}`;
+  }
+
+  return `ADM-PRIN-${new Date().getFullYear()}`;
 }
 
 /**
@@ -62,7 +180,10 @@ export function validateInstitutionalEmail(email?: string | null): EmailValidati
   }
 
   const role = deriveRoleFromEmail(cleanEmail);
-  return { valid: true, domain, prefix, role };
+  const department = deriveDepartment(cleanEmail);
+  const rollNumber = deriveRollNumber(cleanEmail, role);
+
+  return { valid: true, domain, prefix, role, department, rollNumber };
 }
 
 /**
@@ -96,13 +217,12 @@ export function deriveRoleFromEmail(email: string): InstitutionalRole {
   }
 
   // 3. Roll Number / Student digits pattern
-  // Student emails typically embed admission year or serial number: e.g. 2023cs001, cs22091, 101student
   const hasDigits = /\d/.test(prefix);
   if (hasDigits) {
     return "Student";
   }
 
-  // 4. Default faculty / teachers (alphabetical prefixes like first.last, prof.name)
+  // 4. Default faculty / teachers
   return "Teacher";
 }
 
@@ -123,4 +243,3 @@ export function getRoleDashboardPath(role: InstitutionalRole | string): string {
       return "/dashboard/student";
   }
 }
-

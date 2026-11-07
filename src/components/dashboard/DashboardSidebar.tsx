@@ -50,7 +50,7 @@ export const ROLE_NAV_ITEMS: Record<UserRole, NavItem[]> = {
   ],
   hod: [
     { title: "Department Health", href: "/dashboard/hod", icon: LayoutDashboard },
-    { title: "Leave Approvals", href: "/dashboard/hod#leaves", icon: FileCheck, badge: "7 Pending" },
+    { title: "Leave Approvals", href: "/dashboard/hod#leaves", icon: FileCheck },
     { title: "Faculty Load", href: "/dashboard/hod#faculty", icon: Users },
     { title: "Class Schedules", href: "/dashboard/hod#schedule", icon: Calendar },
     { title: "Syllabus Tracking", href: "/dashboard/hod#syllabus", icon: BookOpen },
