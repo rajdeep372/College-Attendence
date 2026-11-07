@@ -1,10 +1,14 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { SignIn, SignOutButton } from "@clerk/nextjs";
 import { 
   GraduationCap, 
-  AlertTriangle
+  ShieldCheck, 
+  AlertTriangle, 
+  School,
+  Lock,
+  Sparkles 
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { InstallPwaPrompt } from "@/components/pwa/InstallPwaPrompt";
@@ -13,14 +17,13 @@ import {
   deriveRoleFromEmail, 
   getRoleDashboardPath 
 } from "@/lib/auth-rbac";
-import { InstitutionalSignInCard } from "@/components/auth/InstitutionalSignInCard";
 
 export default async function HomePage() {
   let clerkUser = null;
   try {
     clerkUser = await currentUser();
   } catch {
-    // In static rendering or unauthenticated session
+    // In static rendering or unauthenticated
   }
 
   // If already logged in, validate institutional email & auto-route immediately
@@ -74,7 +77,7 @@ export default async function HomePage() {
     redirect(targetDashboard);
   }
 
-  // Not logged in: Show clean, professional official college login inside the center card
+  // Not logged in: Show clean, professional official college login
   return (
     <div className="min-h-screen flex flex-col justify-between w-full max-w-full overflow-x-hidden relative">
       {/* Official Header Bar */}
@@ -101,9 +104,63 @@ export default async function HomePage() {
         </div>
       </header>
 
-      {/* Main Login Workspace with Center 3D Glassmorphic SignIn Card */}
+      {/* Main Login Workspace */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-10">
-        <InstitutionalSignInCard />
+        <div className="w-full max-w-md mx-auto space-y-6">
+          {/* Institutional Advisory Card */}
+          <div className="p-4 sm:p-5 rounded-3xl glass-card border border-sky-500/30 text-center shadow-[0_10px_35px_rgba(2,132,199,0.15)] relative overflow-hidden">
+            <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-sky-500/15 blur-2xl pointer-events-none" />
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 mb-2">
+              <Lock className="w-3.5 h-3.5" />
+              <span>Strict Single Sign-On (SSO) Gate</span>
+            </div>
+
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+              Academic Sign-In
+            </h1>
+
+            <p className="mt-1 text-xs text-slate-300 leading-relaxed">
+              Enter your official college email. System auto-routes scholars (with roll-number IDs) to Student stations and faculty to Attendance consoles.
+            </p>
+
+            <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-center gap-2 text-[10px] text-amber-300 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-amber-400" />
+              <span>Personal emails (@gmail.com, @yahoo.com) are rejected</span>
+            </div>
+          </div>
+
+          {/* Clerk Official Sign-In Component Container */}
+          <div className="w-full flex justify-center">
+            <Suspense
+              fallback={
+                <div className="w-full h-80 rounded-3xl glass-card flex items-center justify-center">
+                  <div className="w-8 h-8 border-4 border-sky-400/30 border-t-sky-400 rounded-full animate-spin" />
+                </div>
+              }
+            >
+              <SignIn
+                routing="hash"
+                appearance={{
+                  elements: {
+                    rootBox: "w-full max-w-full",
+                    card: "w-full max-w-full rounded-3xl glass-card border border-sky-400/30 shadow-[0_15px_45px_rgba(2,132,199,0.2)] bg-slate-900/90 text-white",
+                    headerTitle: "text-white text-lg font-bold",
+                    headerSubtitle: "text-slate-300 text-xs",
+                    formButtonPrimary:
+                      "bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold shadow-[0_0_20px_rgba(56,189,248,0.4)] text-xs py-2.5 rounded-xl transition-all",
+                    formFieldInput:
+                      "bg-slate-950/80 border-sky-500/30 text-white placeholder-slate-500 focus:border-sky-400 rounded-xl text-sm",
+                    formFieldLabel: "text-slate-300 text-xs font-semibold",
+                    footerActionLink: "text-sky-400 hover:text-sky-300 font-semibold",
+                    identityPreviewText: "text-slate-200",
+                    identityPreviewEditButton: "text-sky-400",
+                  },
+                }}
+              />
+            </Suspense>
+          </div>
+        </div>
       </main>
 
       {/* Institutional Legal Footer */}
