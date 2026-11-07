@@ -132,7 +132,7 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
         <div>
           <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between">
             <Link
-              href="/"
+              href={`/dashboard/${role.toLowerCase()}`}
               onClick={() => setIsMobileOpen(false)}
               className="flex items-center gap-3 overflow-hidden group cursor-pointer pointer-events-auto"
             >

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Leave from "@/models/Leave";
 import User from "@/models/User";
+import Notification from "@/models/Notification";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose from "mongoose";
 import nodemailer from "nodemailer";
@@ -66,6 +67,52 @@ export async function POST(req: NextRequest) {
       reason,
       status: "Pending",
     });
+
+    // Initial Request Routing: Strictly notify HOD & Principal, explicitly EXCLUDING the requesting teacher's userId
+    try {
+      if (applicantRole === "Teacher") {
+        await Notification.create({
+          targetRole: "HOD",
+          targetDepartment: resolvedDepartment,
+          excludeUserId: resolvedApplicantId,
+          title: "Faculty Leave Request",
+          message: `Prof. ${resolvedApplicantName} has requested ${leaveType} leave from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}. Sanction review required.`,
+          type: "info",
+          link: "/dashboard/hod#leaves",
+          isRead: false,
+          readBy: [],
+          metadata: { leaveId: leave._id, applicantId: resolvedApplicantId },
+        });
+
+        await Notification.create({
+          targetRole: "Principal",
+          excludeUserId: resolvedApplicantId,
+          title: `Faculty Leave Request (${resolvedDepartment})`,
+          message: `Prof. ${resolvedApplicantName} has applied for ${leaveType} leave.`,
+          type: "info",
+          link: "/dashboard/principal#leaves",
+          isRead: false,
+          readBy: [],
+          metadata: { leaveId: leave._id, applicantId: resolvedApplicantId },
+        });
+      } else {
+        // Student leave request: Notify HOD
+        await Notification.create({
+          targetRole: "HOD",
+          targetDepartment: resolvedDepartment,
+          excludeUserId: resolvedApplicantId,
+          title: "Student Leave Application",
+          message: `${resolvedApplicantName} requested ${leaveType} sanction. Review required.`,
+          type: "info",
+          link: "/dashboard/hod#leaves",
+          isRead: false,
+          readBy: [],
+          metadata: { leaveId: leave._id, applicantId: resolvedApplicantId },
+        });
+      }
+    } catch (notifErr) {
+      console.warn("Error creating leave notification:", notifErr);
+    }
 
     return NextResponse.json({
       success: true,
@@ -148,6 +195,22 @@ export async function PATCH(req: NextRequest) {
 
     if (!updated) {
       return NextResponse.json({ success: false, error: "Leave document not found." }, { status: 404 });
+    }
+
+    // Step 2 Requirement: Generate a brand new notification document targeting exclusively the applicant userId
+    try {
+      await Notification.create({
+        recipientId: updated.applicantId,
+        title: `Leave Request ${status}`,
+        message: `Your leave request has been ${status} by the HOD`,
+        type: status === "Approved" ? "success" : "alert",
+        link: updated.applicantRole === "Teacher" ? "/dashboard/teacher" : "/dashboard/student",
+        isRead: false,
+        readBy: [],
+        metadata: { leaveId: updated._id, status, decisionNotes: updated.decisionNotes },
+      });
+    } catch (notifErr) {
+      console.warn("Error creating leave resolution notification:", notifErr);
     }
 
     // Automated notification back to applicant

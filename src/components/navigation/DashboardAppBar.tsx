@@ -39,6 +39,18 @@ export interface NotificationItem {
   link?: string;
 }
 
+interface DepartmentAuditData {
+  department: string;
+  totalStudents: number;
+  totalFaculty: number;
+  activeClasses: number;
+  attendanceSessionsCount: number;
+  averageAttendance: number;
+  turnoutText: string;
+  geofenceStatus: string;
+  timetableSyncText: string;
+}
+
 export function DashboardAppBar() {
   const pathname = usePathname();
   const { isSignedIn, user } = useUser();
@@ -49,6 +61,8 @@ export function DashboardAppBar() {
   const [isAuditsOpen, setIsAuditsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
+  const [auditData, setAuditData] = useState<DepartmentAuditData | null>(null);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
 
   // Close menus on path navigation
   useEffect(() => {
@@ -79,20 +93,63 @@ export function DashboardAppBar() {
     fetchRealNotifications();
   }, [pathname]);
 
+  // Fetch real department audit aggregation when opened
+  useEffect(() => {
+    if (isAuditsOpen) {
+      setIsLoadingAudit(true);
+      fetch("/api/department/audit")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.success) {
+            setAuditData(data);
+          }
+        })
+        .catch((err) => console.warn("Failed to fetch department audit:", err))
+        .finally(() => setIsLoadingAudit(false));
+    }
+  }, [isAuditsOpen]);
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+    } catch (err) {
+      console.warn("Failed to persist mark all read in MongoDB:", err);
+    }
   };
 
-  const handleClearNotifications = () => {
+  const handleClearNotifications = async () => {
     setNotifications([]);
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      });
+    } catch (err) {
+      console.warn("Failed to clear notifications in MongoDB:", err);
+    }
   };
 
-  const handleNotificationClick = (id: string) => {
+  const handleNotificationClick = async (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
+    try {
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+    } catch (err) {
+      console.warn("Failed to persist notification read state in MongoDB:", err);
+    }
   };
 
   // Determine role from pathname
@@ -131,7 +188,7 @@ export function DashboardAppBar() {
 
             {/* University Crest */}
             <Link
-              href="/"
+              href={`/dashboard/${currentRole.toLowerCase()}`}
               className="group flex items-center gap-2.5 transition-transform hover:scale-105 shrink-0"
             >
               <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(56,189,248,0.35)] border border-white/20 shrink-0">
@@ -378,7 +435,9 @@ export function DashboardAppBar() {
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-white">Department Audits & Compliance</h3>
-                    <p className="text-xs text-sky-400">Institutional Ledger Verification</p>
+                    <p className="text-xs text-sky-400 font-semibold truncate max-w-[220px]">
+                      {auditData?.department || "Institutional Department Ledger"}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -394,21 +453,28 @@ export function DashboardAppBar() {
                 <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-between">
                   <span className="text-slate-400 font-medium">Department Turnout Index</span>
                   <span className="px-2.5 py-1 rounded-full font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    96.4% Compliance
+                    {isLoadingAudit ? "Aggregating..." : auditData?.turnoutText || "0.0% Compliance"}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Enrolled Scholars</span>
+                  <span className="px-2.5 py-1 rounded-full font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30 font-mono">
+                    {isLoadingAudit ? "..." : `${auditData?.totalStudents ?? 0} Students`}
+                  </span>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Active Faculty & Classes</span>
+                  <span className="px-2.5 py-1 rounded-full font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                    {isLoadingAudit ? "..." : `${auditData?.activeClasses ?? 0} Classes (${auditData?.totalFaculty ?? 0} Faculty)`}
                   </span>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-between">
                   <span className="text-slate-400 font-medium">Active Geofence Status</span>
-                  <span className="px-2.5 py-1 rounded-full font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                    Operational (&le;50m)
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-between">
-                  <span className="text-slate-400 font-medium">Faculty Timetable Sync</span>
-                  <span className="px-2.5 py-1 rounded-full font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
-                    100% Synchronized
+                  <span className="px-2.5 py-1 rounded-full font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono">
+                    {auditData?.geofenceStatus || "Operational (≤50m)"}
                   </span>
                 </div>
 

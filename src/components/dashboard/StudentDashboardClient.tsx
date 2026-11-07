@@ -6,6 +6,7 @@ import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
 import { DigitalIdModal } from "@/components/modals/DigitalIdModal";
 import { ApplyLeaveModal } from "@/components/modals/ApplyLeaveModal";
+import { StudentTotpModal } from "@/components/modals/StudentTotpModal";
 import { 
   BookOpen, 
   MapPin, 
@@ -25,9 +26,11 @@ import {
   Calendar,
   Layers,
   Bell,
-  ArrowUpCircle
+  ArrowUpCircle,
+  KeyRound
 } from "lucide-react";
 import { calculateHaversineDistance, COLLEGE_COORDINATES } from "@/lib/totp";
+import { parseTimeSlot, getIstCurrentTime } from "@/lib/time-utils";
 
 interface SubjectLedgerItem {
   code: string;
@@ -110,7 +113,9 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
     subject: string;
     timeSlot: string;
     startsInMinutes: number;
+    isLive: boolean;
   } | null>(null);
+  const [isTotpModalOpen, setIsTotpModalOpen] = useState(false);
 
   const fetchAnalytics = async () => {
     try {
@@ -127,32 +132,48 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
       if (data.success && data.analytics) {
         setAnalytics(data.analytics);
 
-        // Check if there is an actual upcoming or currently active lecture matching real clock
+        // Check if there is an actual upcoming or currently active lecture matching real IST clock
         if (data.analytics.todayRoutines && data.analytics.todayRoutines.length > 0) {
-          const now = new Date();
-          const currentMinutes = now.getHours() * 60 + now.getMinutes();
-          let activeUpcoming: { subject: string; timeSlot: string; startsInMinutes: number } | null = null;
+          const { currentMinutes, currentDay } = getIstCurrentTime();
+          let activeUpcoming: {
+            subject: string;
+            timeSlot: string;
+            startsInMinutes: number;
+            isLive: boolean;
+          } | null = null;
 
           for (const r of data.analytics.todayRoutines) {
-            const match = r.timeSlot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
-            if (match) {
-              let hours = parseInt(match[1], 10);
-              const minutes = parseInt(match[2], 10);
-              const meridiem = match[3].toUpperCase();
-              if (meridiem === "PM" && hours < 12) hours += 12;
-              if (meridiem === "AM" && hours === 12) hours = 0;
+            // Only inspect today's routines
+            if (r.dayOfWeek && r.dayOfWeek.toLowerCase() !== currentDay.toLowerCase()) {
+              continue;
+            }
 
-              const slotStartMinutes = hours * 60 + minutes;
-              const diffMinutes = slotStartMinutes - currentMinutes;
+            const interval = parseTimeSlot(r.timeSlot);
+            if (!interval) continue;
 
-              // If starting within next 20 minutes or currently underway (within 50 minutes of start)
-              if (diffMinutes >= -50 && diffMinutes <= 20) {
+            const { startMinutes, endMinutes } = interval;
+
+            // 1. Strictly Active/Live Now between start and end time
+            if (currentMinutes >= startMinutes && currentMinutes < endMinutes) {
+              activeUpcoming = {
+                subject: r.subject,
+                timeSlot: r.timeSlot,
+                startsInMinutes: 0,
+                isLive: true,
+              };
+              break;
+            }
+
+            // 2. Upcoming within next 30 minutes
+            const diff = startMinutes - currentMinutes;
+            if (diff > 0 && diff <= 30) {
+              if (!activeUpcoming || diff < activeUpcoming.startsInMinutes) {
                 activeUpcoming = {
                   subject: r.subject,
                   timeSlot: r.timeSlot,
-                  startsInMinutes: Math.max(0, diffMinutes),
+                  startsInMinutes: diff,
+                  isLive: false,
                 };
-                break;
               }
             }
           }
@@ -296,16 +317,18 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
         {/* User Profile Card from MongoDB */}
         <UserProfileCard user={currentUser} defaultRole="Student" />
 
-        {/* Real-time Upcoming Class Alert Banner (5-10 mins before class) */}
+        {/* Real-time Upcoming / Active Class Alert Banner */}
         {upcomingClass && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-600/30 via-blue-600/30 to-indigo-600/30 border border-sky-400/40 text-white flex items-center justify-between gap-3 shadow-[0_0_30px_rgba(56,189,248,0.25)] animate-pulse">
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-sky-600/30 via-blue-600/30 to-indigo-600/30 border border-sky-400/40 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-[0_0_30px_rgba(56,189,248,0.25)]">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-sky-500 text-slate-950 font-bold">
+              <div className="p-2.5 rounded-xl bg-sky-500 text-slate-950 font-bold shrink-0">
                 <Bell className="w-5 h-5 animate-bounce" />
               </div>
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-sky-300">
-                  Upcoming Lecture in {upcomingClass.startsInMinutes} Minutes
+                  {upcomingClass.isLive
+                    ? "Class In Session: Live Now"
+                    : `Upcoming Lecture in ${upcomingClass.startsInMinutes} Minutes`}
                 </span>
                 <div className="text-sm sm:text-base font-extrabold text-white mt-0.5">
                   {upcomingClass.subject} ({upcomingClass.timeSlot})
@@ -313,9 +336,14 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               </div>
             </div>
 
-            <div className="hidden sm:flex items-center gap-2 text-xs text-emerald-400 bg-emerald-950/60 px-3 py-1.5 rounded-xl border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Attendance Station Open</span>
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+              <button
+                onClick={() => setIsTotpModalOpen(true)}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-[0_0_20px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>Enter 4-Digit TOTP PIN & Check In</span>
+              </button>
             </div>
           </div>
         )}
@@ -390,6 +418,15 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               >
                 <ArrowUpCircle className="w-4 h-4 text-emerald-400" />
                 <span>Upgrade Semester (New Session)</span>
+              </button>
+
+              <button
+                onClick={() => setIsTotpModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.35)] transition-all cursor-pointer"
+                title="Enter 4-digit TOTP PIN to mark class attendance"
+              >
+                <KeyRound className="w-4 h-4" />
+                <span>Enter Class PIN</span>
               </button>
 
               <button
@@ -759,6 +796,15 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           onSuccess={fetchAnalytics}
           userRole="Student"
           department={currentUser?.department || "Computer Science & Engineering"}
+        />
+
+        <StudentTotpModal
+          isOpen={isTotpModalOpen}
+          onClose={() => setIsTotpModalOpen(false)}
+          studentId={currentUser?._id}
+          onSuccess={fetchAnalytics}
+          activeSubject={upcomingClass?.subject}
+          activeTimeSlot={upcomingClass?.timeSlot}
         />
       </div>
     </RoleGuard>

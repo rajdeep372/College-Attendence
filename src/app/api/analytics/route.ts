@@ -7,6 +7,7 @@ import Leave from "@/models/Leave";
 import Circular from "@/models/Circular";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose, { Types } from "mongoose";
+import { computeClassStatus } from "@/lib/time-utils";
 
 export async function GET(req: NextRequest) {
   try {
@@ -371,6 +372,8 @@ export async function GET(req: NextRequest) {
 
           for (const c of toDisplay) {
             classCounter++;
+            const timing = computeClassStatus(c.timeSlot, r.dayOfWeek);
+
             formattedClasses.push({
               _id: r._id.toString(),
               code: c.paperCode || c.subject.split(" ")[0] || `CS-${500 + classCounter * 2}`,
@@ -389,12 +392,14 @@ export async function GET(req: NextRequest) {
               semester: r.semester,
               section: r.section || "Section A",
               hall: `Hall ${r.semester}0${classCounter}`,
-              status: classCounter === 1 ? "Live Now" : "Upcoming",
-              attendance: classCounter === 1 ? "In Session" : "Pending",
+              status: timing.status,
+              attendance: timing.attendance,
             });
           }
         } else if ((r as any).subject) {
           classCounter++;
+          const timing = computeClassStatus((r as any).timeSlot || "", r.dayOfWeek);
+
           formattedClasses.push({
             _id: r._id.toString(),
             code: (r as any).paperCode || (r as any).subject.split(" ")[0] || `CS-${500 + classCounter * 2}`,
@@ -413,8 +418,8 @@ export async function GET(req: NextRequest) {
             semester: r.semester,
             section: r.section || "Section A",
             hall: `Hall ${r.semester}0${classCounter}`,
-            status: classCounter === 1 ? "Live Now" : "Upcoming",
-            attendance: classCounter === 1 ? "In Session" : "Pending",
+            status: timing.status,
+            attendance: timing.attendance,
           });
         }
       }

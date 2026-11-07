@@ -83,6 +83,15 @@ export async function GET(req: NextRequest) {
       unclaimedProfiles,
     });
   } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      typeof (error as { digest?: unknown }).digest === "string" &&
+      (error as { digest: string }).digest.startsWith("NEXT_PRERENDER")
+    ) {
+      throw error;
+    }
     console.error("[API: /api/routine/unclaimed GET] Error:", error);
     const msg = error instanceof Error ? error.message : "Error querying unclaimed routine slots";
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
