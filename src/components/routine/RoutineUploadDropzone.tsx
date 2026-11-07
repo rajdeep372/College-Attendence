@@ -276,10 +276,9 @@ export function RoutineUploadDropzone({
 
         {!parsedResults && (
           <button
-            type="button"
             onClick={handleUploadAndParse}
             disabled={!file || isLoading}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_25px_rgba(56,189,248,0.4)] transition-all cursor-pointer relative z-20"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_25px_rgba(56,189,248,0.4)] transition-all cursor-pointer"
           >
             {isLoading ? (
               <>

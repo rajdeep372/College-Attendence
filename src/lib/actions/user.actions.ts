@@ -3,6 +3,10 @@
 import { currentUser } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { IUser, UserRole } from "@/models/User";
+import { 
+  validateInstitutionalEmail, 
+  deriveRoleFromEmail 
+} from "@/lib/auth-rbac";
 
 export interface SerializedUser {
   _id: string;
@@ -19,7 +23,7 @@ export interface SerializedUser {
 
 /**
  * Fetches the currently authenticated Clerk user's profile and role from MongoDB.
- * If the user does not exist in MongoDB yet, it automatically provisions/syncs them.
+ * Performs Smart Auto-Assignment (Zero Onboarding) based on institutional email prefix.
  */
 export async function getCurrentUser(): Promise<SerializedUser | null> {
   try {
@@ -37,32 +41,39 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
 
     await connectToDatabase();
 
+    const primaryEmail =
+      clerkUser.emailAddresses?.[0]?.emailAddress || "user@college.edu";
+    const fullName =
+      `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
+      clerkUser.username ||
+      "Academic Scholar";
+
+    // Validate institutional email
+    const emailValidation = validateInstitutionalEmail(primaryEmail);
+    // Auto-derive role based on email prefix (digits = Student, letters = Teacher/HOD/Principal)
+    const derivedRole: UserRole = emailValidation.valid && emailValidation.role
+      ? emailValidation.role
+      : deriveRoleFromEmail(primaryEmail);
+
     // Query user by clerkId
     let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean<IUser>();
 
-    // If user not in MongoDB yet, auto-provision from Clerk account
+    // If user not in MongoDB yet, auto-provision with derived role
     if (!dbUser) {
-      const primaryEmail =
-        clerkUser.emailAddresses?.[0]?.emailAddress || "user@college.edu";
-      const fullName =
-        `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
-        clerkUser.username ||
-        "Campus Scholar";
-
-      // Check if role is in clerk metadata
-      const metaRole = (clerkUser.publicMetadata as { role?: UserRole })?.role;
-      const initialRole: UserRole = metaRole || "Student";
-
       const newUser = await User.create({
         clerkId: clerkUser.id,
         name: fullName,
         email: primaryEmail.toLowerCase().trim(),
-        role: initialRole,
+        role: derivedRole,
         department: "Computer Science",
         profilePicture: clerkUser.imageUrl || "",
       });
 
       dbUser = newUser.toObject();
+    } else if (dbUser.role !== derivedRole && derivedRole !== "Student") {
+      // If user was previously default student but email prefix identifies them as Faculty/HOD/Principal, align role
+      await User.updateOne({ _id: dbUser._id }, { $set: { role: derivedRole } });
+      dbUser.role = derivedRole;
     }
 
     if (!dbUser) return null;
@@ -87,7 +98,7 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
 }
 
 /**
- * Update the user's role in MongoDB (useful for admin allocation or demo mode)
+ * Update the user's role in MongoDB
  */
 export async function updateUserRole(
   clerkId: string,
@@ -144,4 +155,3 @@ export async function getUserByClerkId(clerkId: string): Promise<SerializedUser 
     return null;
   }
 }
-

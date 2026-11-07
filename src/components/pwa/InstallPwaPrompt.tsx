@@ -83,9 +83,8 @@ export function InstallPwaPrompt() {
   return (
     <>
       <button
-        type="button"
         onClick={handleInstallClick}
-        className="group relative inline-flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-semibold rounded-xl text-sky-700 dark:text-sky-200 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/60 border border-sky-400/40 hover:border-sky-500/60 transition-all duration-300 shadow-sm dark:shadow-[0_0_15px_rgba(56,189,248,0.15)] backdrop-blur-lg cursor-pointer"
+        className="group relative inline-flex items-center gap-2 px-3.5 py-1.5 text-xs sm:text-sm font-medium rounded-xl text-sky-200 bg-sky-950/40 hover:bg-sky-900/60 border border-sky-500/30 hover:border-sky-400/60 transition-all duration-300 shadow-[0_0_15px_rgba(56,189,248,0.15)] hover:shadow-[0_0_20px_rgba(56,189,248,0.35)] backdrop-blur-lg cursor-pointer"
         title="Install this web app directly without Play Store"
       >
         <span className="relative flex h-2 w-2">

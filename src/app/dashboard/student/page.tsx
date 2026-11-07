@@ -1,5 +1,4 @@
 import React, { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
@@ -17,15 +16,6 @@ import {
 
 async function StudentDashboardContent() {
   const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    redirect("/sign-in");
-  }
-
-  // Strict Authoritative RBAC: Students can only view the Student dashboard
-  if (currentUser.role.toLowerCase() !== "student") {
-    redirect(`/dashboard/${currentUser.role.toLowerCase()}`);
-  }
 
   const subjects = [
     { code: "CS-501", name: "Operating Systems", attended: 36, total: 40, percent: 90.0, status: "safe" },
@@ -73,7 +63,7 @@ async function StudentDashboardContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Dial Card */}
           <div className="p-6 rounded-3xl glass-card border border-sky-500/30 flex flex-col items-center text-center justify-center relative overflow-hidden">
-            <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full bg-sky-500/20 blur-2xl" />
+            <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full bg-sky-500/20 blur-2xl pointer-events-none" />
             
             <div className="relative w-36 h-36 rounded-full border-8 border-sky-500/20 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(56,189,248,0.25)]">
               <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-200">

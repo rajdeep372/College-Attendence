@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { UserRole } from "@/models/User";
 import { currentUser } from "@clerk/nextjs/server";
+import { 
+  validateInstitutionalEmail, 
+  deriveRoleFromEmail, 
+  getRoleDashboardPath 
+} from "@/lib/auth-rbac";
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,17 +65,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Default role assignment: "Student" unless provided as a valid enum
-    const validRoles: UserRole[] = ["Principal", "HOD", "Teacher", "Student"];
-    const role: UserRole =
-      bodyData.role && validRoles.includes(bodyData.role)
-        ? bodyData.role
-        : "Student";
+    // 5. Strict Institutional Email Validation (Reject @gmail.com, etc.)
+    const emailValidation = validateInstitutionalEmail(email);
+    if (!emailValidation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: emailValidation.error,
+          policy: "Official college accounts only. Consumer email domains are prohibited.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // 6. Smart Auto-Assignment (Zero Onboarding):
+    // Digits in email prefix -> Student; Names -> Teacher / HOD / Principal
+    const autoAssignedRole: UserRole =
+      emailValidation.role || deriveRoleFromEmail(email);
 
     const department = bodyData.department || "Computer Science";
     const phone = bodyData.phone || "";
 
-    // 5. Upsert User in MongoDB
+    // 7. Upsert User in MongoDB
     const syncedUser = await User.findOneAndUpdate(
       { clerkId },
       {
@@ -78,7 +94,7 @@ export async function POST(req: NextRequest) {
         name: name || "Campus Scholar",
         email: email.toLowerCase().trim(),
         phone,
-        role,
+        role: autoAssignedRole,
         department,
         profilePicture: profilePicture || "",
       },
@@ -92,7 +108,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        message: "Clerk user successfully synchronized with MongoDB",
+        message: "Clerk user synchronized with auto-assigned institutional role",
+        role: autoAssignedRole,
+        redirectPath: getRoleDashboardPath(autoAssignedRole),
         user: syncedUser,
       },
       { status: 200 }
@@ -154,4 +172,3 @@ export async function GET(req: NextRequest) {
     );
   }
 }
-

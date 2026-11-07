@@ -30,24 +30,32 @@ export default clerkMiddleware(async (auth, req) => {
     if (!isPublicRoute(req)) {
       const session = await auth();
       if (!session.userId) {
-        return session.redirectToSignIn();
+        return session.redirectToSignIn({ returnBackUrl: req.url });
       }
 
-      // Robust role check from Clerk session claims metadata
-      const claims = session.sessionClaims as Record<string, unknown> | undefined;
-      const userRole = (
-        (claims?.metadata as { role?: string })?.role ||
-        (claims?.publicMetadata as { role?: string })?.role ||
-        (claims?.role as string)
-      )?.toLowerCase();
+      // Strict RBAC route checking
+      const userRole = (session.sessionClaims?.metadata as { role?: string })?.role?.toLowerCase();
       const path = req.nextUrl.pathname.toLowerCase();
 
-      // If user has a role and tries to visit a different role's dashboard, strictly redirect them
-      if (userRole && path.startsWith("/dashboard/")) {
-        const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
-        if (targetRole && targetRole !== userRole && ["principal", "hod", "teacher", "student"].includes(targetRole)) {
+      // If user has a registered role and accesses dashboard
+      if (userRole) {
+        // Direct /dashboard visits route to specific role portal
+        if (path === "/dashboard" || path === "/dashboard/") {
           const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
           return NextResponse.redirect(redirectUrl);
+        }
+
+        // Strict cross-role isolation: Student can never access Teacher/HOD/Principal
+        if (path.startsWith("/dashboard/")) {
+          const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
+          if (
+            targetRole &&
+            ["principal", "hod", "teacher", "student"].includes(targetRole) &&
+            targetRole !== userRole
+          ) {
+            const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
+            return NextResponse.redirect(redirectUrl);
+          }
         }
       }
     }

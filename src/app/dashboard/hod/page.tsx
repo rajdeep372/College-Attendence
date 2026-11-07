@@ -1,5 +1,4 @@
 import React, { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
@@ -19,14 +18,6 @@ import {
 
 async function HodDashboardContent() {
   const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    redirect("/sign-in");
-  }
-
-  if (currentUser.role.toLowerCase() !== "hod") {
-    redirect(`/dashboard/${currentUser.role.toLowerCase()}`);
-  }
 
   const departmentStats = [
     { label: "Branch Attendance", value: "96.4%", sub: "Computer Science Dept", icon: UserCheck, color: "from-blue-500 to-indigo-600" },

@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React from "react";
 import Link from "next/link";
 import { UserRole } from "@/models/User";
 import { SerializedUser } from "@/lib/actions/user.actions";
-import { ShieldAlert, ArrowRight, Lock, RefreshCw } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { ShieldAlert, ArrowRight, Lock } from "lucide-react";
+import { getRoleDashboardPath } from "@/lib/auth-rbac";
 
 interface RoleGuardProps {
   allowedRole: UserRole;
@@ -14,73 +14,74 @@ interface RoleGuardProps {
 }
 
 export function RoleGuard({ allowedRole, user, children }: RoleGuardProps) {
-  const router = useRouter();
-
-  // If user is not authenticated, redirect to Sign In
-  useEffect(() => {
-    if (!user) {
-      router.replace("/sign-in");
-    }
-  }, [user, router]);
-
+  // If no user is logged in
   if (!user) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-12 h-12 rounded-2xl bg-sky-500/20 text-sky-400 flex items-center justify-center mb-4 border border-sky-400/30">
-          <Lock className="w-6 h-6 animate-pulse" />
+      <div className="space-y-4">
+        <div className="p-3.5 rounded-2xl bg-amber-950/40 border border-amber-500/30 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-amber-200 backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-400" />
+            <span>
+              <strong>Authentication Required:</strong> Please sign in with your official college credentials to view the <strong>{allowedRole}</strong> station.
+            </span>
+          </div>
+          <Link
+            href="/sign-in"
+            className="text-sky-300 hover:text-white font-semibold underline shrink-0"
+          >
+            Sign In &rarr;
+          </Link>
         </div>
-        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Authentication Required</h3>
-        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-sm">
-          Redirecting to secure login station...
-        </p>
+        {children}
       </div>
     );
   }
 
-  const userRoleNormalized = user.role.toLowerCase();
-  const allowedRoleNormalized = allowedRole.toLowerCase();
-  const isAuthorized = userRoleNormalized === allowedRoleNormalized;
+  // Check case-insensitive match for role ("Teacher" vs "teacher")
+  const userRoleNormalized = (user.role || "").toLowerCase();
+  const allowedRoleNormalized = (allowedRole || "").toLowerCase();
 
-  // Strict RBAC: Automatically redirect unauthorized user to their own verified dashboard
-  useEffect(() => {
-    if (!isAuthorized && user) {
-      const targetPortal = `/dashboard/${user.role.toLowerCase()}`;
-      router.replace(targetPortal);
-    }
-  }, [isAuthorized, user, router]);
+  const isAuthorized = userRoleNormalized === allowedRoleNormalized;
 
   if (!isAuthorized) {
     return (
-      <div className="max-w-xl mx-auto my-12 p-8 rounded-3xl glass-card border border-rose-500/30 text-center shadow-[0_0_50px_rgba(244,63,94,0.15)] animate-fade-in">
-        <div className="inline-flex p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 mb-4 shadow-md">
+      <div className="max-w-xl mx-auto my-12 p-6 sm:p-8 rounded-3xl glass-card border-2 border-rose-500/40 text-center shadow-[0_20px_50px_rgba(244,63,94,0.25)] animate-fade-in relative overflow-hidden">
+        <div className="absolute -top-16 -right-16 w-36 h-36 rounded-full bg-rose-500/15 blur-3xl pointer-events-none" />
+
+        <div className="mx-auto w-16 h-16 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 flex items-center justify-center mb-4 shadow-lg">
           <ShieldAlert className="w-8 h-8" />
         </div>
 
-        <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-          Strict Access Restriction
+        <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/15 text-rose-300 border border-rose-500/30 mb-2">
+          Strict Institutional RBAC Violation
+        </span>
+
+        <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+          Unauthorized Role Sector
         </h2>
 
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-          Access denied. This dashboard is restricted to <strong>{allowedRole}</strong> credentials only.
+        <p className="mt-2 text-xs sm:text-sm text-slate-300 leading-relaxed">
+          This academic station is strictly reserved for verified <strong>{allowedRole}</strong> credentials.
+          Your authenticated institutional profile is registered as <strong className="text-sky-300 font-mono">{user.role}</strong>. Cross-role navigation is prohibited by institutional policy.
         </p>
 
-        <div className="mt-5 p-4 rounded-2xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-white/5 text-xs text-slate-700 dark:text-slate-300 max-w-sm mx-auto space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">Your Identity:</span>
-            <span className="font-semibold">{user.name}</span>
+        <div className="mt-6 p-4 rounded-2xl bg-slate-900/80 border border-white/5 text-xs text-left max-w-sm mx-auto space-y-2">
+          <div className="flex items-center justify-between text-slate-400">
+            <span>Identity:</span>
+            <span className="font-semibold text-white truncate max-w-[180px]">{user.name}</span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-slate-500">Assigned Role:</span>
-            <span className="font-bold text-sky-600 dark:text-sky-400">{user.role}</span>
+          <div className="flex items-center justify-between text-slate-400">
+            <span>Assigned Role:</span>
+            <span className="font-bold text-sky-400 font-mono">{user.role}</span>
           </div>
         </div>
 
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className="mt-6 pt-4 border-t border-white/10 flex justify-center">
           <Link
-            href={`/dashboard/${user.role.toLowerCase()}`}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 shadow-lg shadow-sky-500/25 transition-all cursor-pointer"
+            href={getRoleDashboardPath(user.role)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_20px_rgba(56,189,248,0.4)] transition-all cursor-pointer"
           >
-            <span>Proceed to My {user.role} Dashboard</span>
+            <span>Return to My Authorized {user.role} Station</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </div>

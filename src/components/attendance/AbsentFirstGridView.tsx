@@ -205,9 +205,8 @@ export function AbsentFirstGridView() {
           💡 <strong>Absent-First Logic:</strong> All scholars are marked <strong>Present</strong> by default. <span className="text-rose-400 font-semibold">Tap any student</span> who is not in the classroom to mark them <strong>Absent (Red)</strong>.
         </div>
 
-        <div className="flex items-center gap-2 shrink-0 relative z-20">
+        <div className="flex items-center gap-2 shrink-0">
           <button
-            type="button"
             onClick={markAllPresent}
             className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10 transition-all cursor-pointer flex items-center gap-1.5"
             title="Reset everyone to present"
@@ -216,7 +215,6 @@ export function AbsentFirstGridView() {
             <span>Reset All Present</span>
           </button>
           <button
-            type="button"
             onClick={fetchTodayClassRoster}
             className="p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-white/10 transition-all cursor-pointer"
             title="Reload Class Roster"
@@ -357,7 +355,7 @@ export function AbsentFirstGridView() {
       )}
 
       {/* Bottom Sticky Action Bar: Submit Attendance */}
-      <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 relative z-20">
+      <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-xs text-slate-300">
           <Users className="w-4 h-4 text-sky-400" />
           <span>
@@ -367,10 +365,9 @@ export function AbsentFirstGridView() {
         </div>
 
         <button
-          type="button"
           onClick={handleSubmitAttendance}
           disabled={isSubmitting || isLoading || totalEnrolled === 0}
-          className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-emerald-500 via-teal-600 to-sky-600 hover:from-emerald-400 hover:to-sky-500 shadow-[0_0_30px_rgba(16,185,129,0.45)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer relative z-20"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-3.5 rounded-2xl text-sm font-bold text-white bg-gradient-to-r from-emerald-500 via-teal-600 to-sky-600 hover:from-emerald-400 hover:to-sky-500 shadow-[0_0_30px_rgba(16,185,129,0.45)] hover:shadow-[0_0_40px_rgba(16,185,129,0.6)] disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
         >
           {isSubmitting ? (
             <>

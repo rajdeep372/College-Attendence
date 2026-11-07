@@ -1,5 +1,4 @@
 import React, { Suspense } from "react";
-import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
@@ -20,14 +19,6 @@ import {
 
 async function PrincipalDashboardContent() {
   const currentUser = await getCurrentUser();
-
-  if (!currentUser) {
-    redirect("/sign-in");
-  }
-
-  if (currentUser.role.toLowerCase() !== "principal") {
-    redirect(`/dashboard/${currentUser.role.toLowerCase()}`);
-  }
 
   const stats = [
     {
@@ -121,7 +112,7 @@ async function PrincipalDashboardContent() {
                 className="group relative p-5 rounded-2xl glass-card glass-card-interactive border border-white/10 hover:border-purple-400/50"
               >
                 <div
-                  className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity"
+                  className="absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none"
                   style={{ backgroundColor: stat.glow }}
                 />
                 <div className="flex items-center justify-between mb-3">

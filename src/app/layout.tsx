@@ -26,9 +26,9 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "AcademiaSync | Advanced College Management & Smart Attendance",
+  title: "AcademiaSync | Official College Management & Attendance Portal",
   description:
-    "Ultra-modern 3D Glassmorphic College Management and Smart Attendance Platform with Real-Time Geofencing, Biometrics, and Multi-Role Access Control.",
+    "Official Institutional College Management and Smart Attendance Platform with Real-Time Geofencing, Biometrics, and Automated Role-Based Access.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -54,9 +54,9 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-x-hidden`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
+      <body className="min-h-full flex flex-col font-sans bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white overflow-x-hidden w-full max-w-full">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -64,8 +64,8 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {/* Ambient Aurora Orbs for 3D Glassmorphic Lighting (Non-blocking) */}
-            <div className="aurora-bg pointer-events-none" aria-hidden="true">
+            {/* Ambient Aurora Orbs for 3D Glassmorphic Lighting */}
+            <div className="aurora-bg pointer-events-none select-none" aria-hidden="true">
               <div className="aurora-orb-1 pointer-events-none" />
               <div className="aurora-orb-2 pointer-events-none" />
               <div className="aurora-orb-3 pointer-events-none" />
@@ -75,7 +75,7 @@ export default function RootLayout({
             <ServiceWorkerRegister />
 
             {/* Main Application Container */}
-            <div className="relative z-10 flex min-h-screen flex-col">
+            <div className="relative z-10 flex min-h-screen flex-col w-full max-w-full overflow-x-hidden">
               {children}
             </div>
           </AuthProvider>

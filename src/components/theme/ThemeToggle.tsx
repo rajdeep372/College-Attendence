@@ -5,7 +5,7 @@ import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
 
 export function ThemeToggle() {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -14,25 +14,25 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <div className="w-10 h-10 rounded-xl bg-slate-200/50 dark:bg-slate-800/40 border border-slate-300 dark:border-white/10" />
+      <div className="w-9 h-9 rounded-xl bg-slate-800/40 border border-white/10" />
     );
   }
 
-  const currentTheme = resolvedTheme || theme;
-  const isDark = currentTheme === "dark";
+  const isDark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="relative z-10 p-2.5 rounded-xl bg-white/80 hover:bg-white dark:bg-slate-900/80 dark:hover:bg-slate-800 border border-sky-400/30 text-slate-700 dark:text-slate-200 hover:text-sky-600 dark:hover:text-sky-300 transition-all duration-300 backdrop-blur-md shadow-sm dark:shadow-[0_0_15px_rgba(56,189,248,0.15)] hover:shadow-md cursor-pointer flex items-center justify-center"
-      aria-label="Toggle dark/light mode"
+      className="relative p-2 rounded-xl bg-slate-800/50 hover:bg-slate-700/60 border border-sky-500/20 hover:border-sky-400/50 text-slate-200 hover:text-sky-300 transition-all duration-300 backdrop-blur-md shadow-[0_0_15px_rgba(56,189,248,0.1)] hover:shadow-[0_0_20px_rgba(56,189,248,0.25)] cursor-pointer"
+      aria-label="Toggle theme"
       title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
     >
       {isDark ? (
-        <Sun className="w-4 h-4 text-amber-400 transition-transform duration-300 hover:rotate-45" />
+        <Sun className="w-4 h-4 text-amber-300 transition-transform hover:rotate-45" />
       ) : (
-        <Moon className="w-4 h-4 text-sky-600 transition-transform duration-300 hover:-rotate-12" />
+        <Moon className="w-4 h-4 text-sky-400 transition-transform hover:-rotate-12" />
       )}
     </button>
   );
 }
+

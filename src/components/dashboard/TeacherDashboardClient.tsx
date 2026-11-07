@@ -77,7 +77,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 relative z-20">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 onClick={() => setIsQrActive(!isQrActive)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all cursor-pointer"
