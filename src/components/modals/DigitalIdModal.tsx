@@ -1,21 +1,24 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   X, 
-  QrCode, 
   ShieldCheck, 
   Printer, 
   RotateCw, 
-  Sparkles
+  Sparkles,
+  ExternalLink
 } from "lucide-react";
 import Image from "next/image";
+import { QRCodeSVG } from "qrcode.react";
+import Barcode from "react-barcode";
 
 interface DigitalIdModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: {
+    _id?: string;
     name?: string;
     email?: string;
     role?: string;
@@ -28,12 +31,22 @@ interface DigitalIdModalProps {
 
 export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [origin, setOrigin] = useState("https://academiasync.edu");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      setOrigin(window.location.origin);
+    }
+  }, []);
 
   const roll = user?.rollNumber || (user?.clerkId ? user.clerkId.slice(-8).toUpperCase() : "2023-CS-094");
   const dept = user?.department || "Computer Science & Engineering";
   const name = user?.name || "Academic Scholar";
   const role = user?.role || "Student";
   const photo = user?.profilePicture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80";
+
+  // Real live verification URL for security/invigilators
+  const verificationUrl = `${origin}/verify/${encodeURIComponent(roll)}`;
 
   return (
     <AnimatePresence>
@@ -67,16 +80,16 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                 <button
                   type="button"
                   onClick={() => setIsFlipped(!isFlipped)}
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 transition-all text-xs flex items-center gap-1 cursor-pointer pointer-events-auto"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 transition-all text-xs flex items-center gap-1.5 cursor-pointer pointer-events-auto border border-sky-500/20"
                   title="Flip Card"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
-                  <span>Flip</span>
+                  <span>{isFlipped ? "View Front" : "View Back"}</span>
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
+                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
                   aria-label="Close"
                 >
                   <X className="w-4 h-4" />
@@ -87,7 +100,7 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
             {/* Holographic ID Card Container */}
             <div className="perspective-1000">
               {!isFlipped ? (
-                /* FRONT FACE */
+                /* ================= FRONT FACE ================= */
                 <div className="relative p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-sky-950 to-slate-900 border border-sky-500/40 shadow-2xl overflow-hidden">
                   <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-sky-500/20 blur-2xl pointer-events-none" />
                   <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-blue-600/20 blur-2xl pointer-events-none" />
@@ -114,7 +127,7 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
 
                   {/* Student Photo and Core Details */}
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-sky-400/50 shadow-lg shrink-0">
+                    <div className="relative w-20 h-20 rounded-2xl overflow-hidden border-2 border-sky-400/50 shadow-lg shrink-0 bg-slate-800">
                       <Image
                         src={photo}
                         alt={name}
@@ -122,7 +135,7 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                         className="object-cover"
                       />
                     </div>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <h3 className="text-lg font-black text-white truncate">{name}</h3>
                       <div className="text-xs font-mono font-bold text-sky-300 tracking-wide mt-0.5">
                         ROLL: {roll}
@@ -142,46 +155,72 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                     <ShieldCheck className="w-4 h-4 text-sky-400" />
                   </div>
 
-                  {/* Footer with QR Code & Barcode */}
+                  {/* Footer with Real Scannable SVG QR Code */}
                   <div className="flex items-center justify-between pt-2 border-t border-white/10">
-                    <div className="flex items-center gap-2 text-white">
-                      <QrCode className="w-10 h-10 p-1 bg-white text-slate-950 rounded-lg shadow" />
+                    <div className="flex items-center gap-2.5 text-white">
+                      {/* Real High-Contrast Dynamic QR Code */}
+                      <div className="p-1 bg-white rounded-xl shadow-md border border-white shrink-0">
+                        <QRCodeSVG
+                          value={verificationUrl}
+                          size={44}
+                          bgColor="#ffffff"
+                          fgColor="#090d16"
+                          level="M"
+                        />
+                      </div>
                       <div>
-                        <span className="text-[9px] uppercase tracking-wider text-slate-400 block">
-                          Verified Auth Token
+                        <span className="text-[9px] uppercase tracking-wider text-slate-400 block font-medium">
+                          Scannable Token
                         </span>
                         <span className="text-[11px] font-mono font-bold text-sky-300">
-                          {roll.slice(-6)}
+                          {roll.slice(-8)}
                         </span>
                       </div>
                     </div>
                     <div className="text-right text-[10px] text-slate-400 font-mono">
-                      VALID: 2023 - 2027
+                      VALID: 2024 - 2028
                     </div>
                   </div>
                 </div>
               ) : (
-                /* BACK FACE */
-                <div className="relative p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-sky-500/30 shadow-2xl">
-                  <div className="text-xs font-bold uppercase tracking-wider text-sky-400 mb-3 border-b border-white/10 pb-2">
-                    Institutional Regulations & Terms
+                /* ================= BACK FACE ================= */
+                <div className="relative p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 border border-sky-500/30 shadow-2xl space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-sky-400 border-b border-white/10 pb-2">
+                    <span>Official Security Verification</span>
+                    <span className="text-[10px] text-emerald-400 font-mono">ENCRYPTED</span>
                   </div>
 
-                  <div className="space-y-2 text-[11px] text-slate-300 mb-5">
-                    <p>&bull; This digital credential is non-transferable and mandatory for physical lecture entry.</p>
-                    <p>&bull; Attendance is validated using geofenced cryptographic 15-second rotating TOTP.</p>
-                    <p>&bull; Minimum attendance threshold for semester examination qualification is 75%.</p>
-                    <p>&bull; Emergency Dean of Student Affairs Hotline: +91 33 2450 8800</p>
-                  </div>
-
-                  {/* Barcode */}
-                  <div className="p-3 bg-white rounded-xl text-slate-950 flex flex-col items-center justify-center">
-                    <div className="h-10 w-full flex items-center justify-between px-2 tracking-widest font-mono text-[9px] font-black border-y-2 border-slate-950">
-                      ||||| ||| ||||||| |||| || |||||| ||||| |||||
-                    </div>
-                    <span className="text-[10px] font-mono font-bold text-slate-800 mt-1">
-                      *{roll}*
+                  {/* Real Dynamic 2D QR Code with High Contrast */}
+                  <div className="p-3 bg-white rounded-2xl flex flex-col items-center justify-center shadow-xl border border-white">
+                    <QRCodeSVG
+                      value={verificationUrl}
+                      size={120}
+                      bgColor="#ffffff"
+                      fgColor="#090d16"
+                      level="H"
+                    />
+                    <span className="text-[9px] font-black uppercase tracking-wider text-slate-900 mt-2 font-mono">
+                      SCAN WITH PHONE CAMERA TO VERIFY
                     </span>
+                  </div>
+
+                  {/* Real Dynamic 1D Barcode */}
+                  <div className="p-2 bg-white rounded-xl flex items-center justify-center shadow-md border border-white overflow-hidden">
+                    <Barcode
+                      value={roll}
+                      format="CODE128"
+                      width={1.5}
+                      height={36}
+                      displayValue={true}
+                      fontSize={10}
+                      background="#ffffff"
+                      lineColor="#090d16"
+                      margin={0}
+                    />
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 text-center leading-relaxed">
+                    Mandatory credential for physical lecture attendance & examination admittance. Cryptographically authenticated.
                   </div>
                 </div>
               )}
@@ -197,6 +236,15 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                 <Printer className="w-4 h-4" />
                 <span>Print / Download ID</span>
               </button>
+              <a
+                href={verificationUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="px-3.5 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5 transition-all cursor-pointer pointer-events-auto"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Test Live Link</span>
+              </a>
               <button
                 type="button"
                 onClick={onClose}

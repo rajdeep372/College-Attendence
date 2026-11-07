@@ -168,6 +168,33 @@ export async function GET(req: NextRequest) {
           .lean();
       }
 
+      // Fetch today's routines for this student's department/semester to feed live lecture alerts
+      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const rawDay = daysOfWeek[new Date().getDay()] || "Monday";
+      const activeDay = rawDay === "Sunday" ? "Monday" : rawDay;
+
+      const studentDept = department || dbUser?.department || "Computer Science & Engineering";
+      const routinesToday = await Routine.find({
+        department: studentDept,
+        dayOfWeek: activeDay as any,
+      })
+        .populate("teacherId", "name email")
+        .sort({ timeSlot: 1 })
+        .lean();
+
+      // If no routines for today, fetch routines for the department to ensure schedule is visible
+      const fallbackRoutines = routinesToday.length > 0 
+        ? routinesToday 
+        : await Routine.find({ department: studentDept }).populate("teacherId", "name email").limit(4).lean();
+
+      const todayRoutines = fallbackRoutines.map((r: any) => ({
+        _id: r._id.toString(),
+        subject: r.subject,
+        timeSlot: r.timeSlot,
+        dayOfWeek: r.dayOfWeek,
+        teacherName: r.teacherId?.name || "Assigned Faculty",
+      }));
+
       return NextResponse.json({
         success: true,
         role: "Student",
@@ -180,6 +207,7 @@ export async function GET(req: NextRequest) {
           subjects: subjectsList,
           recentCirculars: circulars,
           leaves: studentLeaves,
+          todayRoutines,
         },
       });
     }
