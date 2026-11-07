@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
@@ -19,6 +20,14 @@ import {
 
 async function PrincipalDashboardContent() {
   const currentUser = await getCurrentUser();
+
+  if (!currentUser) {
+    redirect("/sign-in");
+  }
+
+  if (currentUser.role.toLowerCase() !== "principal") {
+    redirect(`/dashboard/${currentUser.role.toLowerCase()}`);
+  }
 
   const stats = [
     {
@@ -74,7 +83,7 @@ async function PrincipalDashboardContent() {
 
         {/* Top Welcome Banner */}
         <div className="relative p-6 sm:p-8 rounded-3xl glass-card border border-purple-500/30 overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-purple-600/20 blur-3xl" />
+          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-purple-600/20 blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-300 border border-purple-500/20 mb-3">

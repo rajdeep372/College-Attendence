@@ -62,7 +62,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
 
         {/* Banner */}
         <div className="relative p-6 sm:p-8 rounded-3xl glass-card border border-emerald-500/30 overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-emerald-600/20 blur-3xl" />
+          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-emerald-600/20 blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 mb-3">
@@ -77,7 +77,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3 relative z-20">
               <button
                 onClick={() => setIsQrActive(!isQrActive)}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-[0_0_25px_rgba(16,185,129,0.4)] transition-all cursor-pointer"

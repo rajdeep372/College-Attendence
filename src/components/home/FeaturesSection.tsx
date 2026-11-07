@@ -88,11 +88,11 @@ export function FeaturesSection() {
             return (
               <div
                 key={index}
-                className="group relative p-7 rounded-3xl glass-card glass-card-interactive glass-specular border border-white/10 hover:border-sky-400/50 flex flex-col justify-between"
+                className="group relative p-7 rounded-3xl glass-card glass-card-interactive glass-specular border border-slate-200 dark:border-white/10 hover:border-sky-400/50 flex flex-col justify-between"
               >
                 {/* Ambient glow in card background */}
                 <div
-                  className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity"
+                  className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity pointer-events-none"
                   style={{ backgroundColor: feat.glow }}
                 />
 
@@ -103,22 +103,22 @@ export function FeaturesSection() {
                     >
                       <Icon className="w-6 h-6" />
                     </div>
-                    <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-white/10 text-sky-300 border border-white/10 backdrop-blur-md">
+                    <span className="px-3 py-1 rounded-full text-[11px] font-semibold bg-sky-500/10 dark:bg-white/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 dark:border-white/10 backdrop-blur-md">
                       {feat.badge}
                     </span>
                   </div>
 
-                  <h3 className="text-xl font-bold text-white group-hover:text-sky-300 transition-colors">
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-sky-600 dark:group-hover:text-sky-300 transition-colors">
                     {feat.title}
                   </h3>
 
-                  <p className="mt-3 text-sm text-slate-300 leading-relaxed">
+                  <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
                     {feat.description}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/10 flex items-center gap-2 text-xs font-semibold text-sky-400">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
+                <div className="mt-6 pt-4 border-t border-slate-200 dark:border-white/10 flex items-center gap-2 text-xs font-semibold text-sky-600 dark:text-sky-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
                   <span>Integrated with Clerk & MongoDB Architecture</span>
                 </div>
               </div>

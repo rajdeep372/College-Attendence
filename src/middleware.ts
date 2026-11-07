@@ -33,11 +33,16 @@ export default clerkMiddleware(async (auth, req) => {
         return session.redirectToSignIn();
       }
 
-      // Role check from Clerk metadata if present
-      const userRole = (session.sessionClaims?.metadata as { role?: string })?.role?.toLowerCase();
+      // Robust role check from Clerk session claims metadata
+      const claims = session.sessionClaims as Record<string, unknown> | undefined;
+      const userRole = (
+        (claims?.metadata as { role?: string })?.role ||
+        (claims?.publicMetadata as { role?: string })?.role ||
+        (claims?.role as string)
+      )?.toLowerCase();
       const path = req.nextUrl.pathname.toLowerCase();
 
-      // If user has a role and tries to visit a different role's dashboard, redirect to their assigned one
+      // If user has a role and tries to visit a different role's dashboard, strictly redirect them
       if (userRole && path.startsWith("/dashboard/")) {
         const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
         if (targetRole && targetRole !== userRole && ["principal", "hod", "teacher", "student"].includes(targetRole)) {

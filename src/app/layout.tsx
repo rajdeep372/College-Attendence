@@ -56,7 +56,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col font-sans bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white">
+      <body className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white transition-colors duration-300">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -64,11 +64,11 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {/* Ambient Aurora Orbs for 3D Glassmorphic Lighting */}
-            <div className="aurora-bg">
-              <div className="aurora-orb-1" />
-              <div className="aurora-orb-2" />
-              <div className="aurora-orb-3" />
+            {/* Ambient Aurora Orbs for 3D Glassmorphic Lighting (Non-blocking) */}
+            <div className="aurora-bg pointer-events-none" aria-hidden="true">
+              <div className="aurora-orb-1 pointer-events-none" />
+              <div className="aurora-orb-2 pointer-events-none" />
+              <div className="aurora-orb-3 pointer-events-none" />
             </div>
 
             {/* PWA Service Worker Registration */}

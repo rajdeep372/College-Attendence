@@ -9,7 +9,7 @@ export function PwaBannerSection() {
     <section id="pwa" className="py-20 relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative p-8 sm:p-12 rounded-3xl glass-card border border-sky-400/40 bg-gradient-to-r from-slate-900/90 via-sky-950/40 to-slate-900/90 overflow-hidden shadow-[0_0_50px_rgba(56,189,248,0.2)]">
-          <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-sky-500/15 blur-3xl" />
+          <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-sky-500/15 blur-3xl pointer-events-none" />
 
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
             <div className="lg:col-span-8 space-y-4">

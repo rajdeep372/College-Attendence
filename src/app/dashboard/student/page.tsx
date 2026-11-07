@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
@@ -17,6 +18,15 @@ import {
 async function StudentDashboardContent() {
   const currentUser = await getCurrentUser();
 
+  if (!currentUser) {
+    redirect("/sign-in");
+  }
+
+  // Strict Authoritative RBAC: Students can only view the Student dashboard
+  if (currentUser.role.toLowerCase() !== "student") {
+    redirect(`/dashboard/${currentUser.role.toLowerCase()}`);
+  }
+
   const subjects = [
     { code: "CS-501", name: "Operating Systems", attended: 36, total: 40, percent: 90.0, status: "safe" },
     { code: "CS-502", name: "Distributed Cloud Systems", attended: 32, total: 35, percent: 91.4, status: "safe" },
@@ -32,7 +42,7 @@ async function StudentDashboardContent() {
 
         {/* Banner */}
         <div className="relative p-6 sm:p-8 rounded-3xl glass-card border border-sky-500/30 overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-sky-600/20 blur-3xl" />
+          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-sky-600/20 blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 mb-3">

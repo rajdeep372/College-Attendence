@@ -1,10 +1,9 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import { SerializedUser } from "@/lib/actions/user.actions";
 import { UserRole } from "@/models/User";
-import { ShieldCheck, Mail, Building, Phone, Sparkles, User as UserIcon } from "lucide-react";
+import { ShieldCheck, Mail, Building, Sparkles } from "lucide-react";
 
 interface UserProfileCardProps {
   user: SerializedUser | null;
@@ -20,19 +19,19 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
 
   const roleColors: Record<UserRole, { badge: string; glow: string }> = {
     Principal: {
-      badge: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+      badge: "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/30",
       glow: "rgba(168, 85, 247, 0.35)",
     },
     HOD: {
-      badge: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+      badge: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
       glow: "rgba(59, 130, 246, 0.35)",
     },
     Teacher: {
-      badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+      badge: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
       glow: "rgba(16, 185, 129, 0.35)",
     },
     Student: {
-      badge: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+      badge: "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30",
       glow: "rgba(14, 165, 233, 0.35)",
     },
   };
@@ -40,10 +39,10 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
   const currentTheme = roleColors[role] || roleColors.Student;
 
   return (
-    <div className="relative p-5 sm:p-6 rounded-3xl glass-card border border-sky-400/25 shadow-[0_10px_35px_rgba(2,132,199,0.15)] overflow-hidden">
-      {/* Glow Halo */}
+    <div className="relative p-5 sm:p-6 rounded-3xl glass-card border border-sky-400/25 shadow-[0_10px_35px_rgba(2,132,199,0.12)] overflow-hidden">
+      {/* Glow Halo (Strictly Non-Blocking) */}
       <div
-        className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-30"
+        className="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-3xl opacity-30 pointer-events-none"
         style={{ backgroundColor: currentTheme.glow }}
       />
 
@@ -62,14 +61,14 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
                 {name.charAt(0).toUpperCase()}
               </div>
             )}
-            <span className="absolute -bottom-1 -right-1 p-1 rounded-full bg-emerald-500 border-2 border-slate-950 text-white">
+            <span className="absolute -bottom-1 -right-1 p-1 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-950 text-white">
               <ShieldCheck className="w-3 h-3" />
             </span>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight">
                 {name}
               </h2>
               <span
@@ -79,13 +78,13 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
               </span>
             </div>
 
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-300">
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300">
               <span className="flex items-center gap-1.5">
-                <Mail className="w-3.5 h-3.5 text-sky-400" />
+                <Mail className="w-3.5 h-3.5 text-sky-500 dark:text-sky-400" />
                 <span>{email}</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-cyan-400" />
+                <Building className="w-3.5 h-3.5 text-blue-500 dark:text-cyan-400" />
                 <span>{department}</span>
               </span>
             </div>
@@ -93,17 +92,16 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
         </div>
 
         {/* Right: MongoDB Sync Status Badge */}
-        <div className="flex items-center sm:flex-col sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-white/10 text-xs">
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+        <div className="flex items-center sm:flex-col sm:items-end justify-between border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-200 dark:border-white/10 text-xs">
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
             <Sparkles className="w-3.5 h-3.5 animate-pulse" />
             <span>MongoDB Synchronized</span>
           </div>
-          <span className="text-[10px] text-slate-400 sm:mt-1 font-mono">
-            DB Profile Active
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 sm:mt-1 font-mono">
+            DB Profile Verified
           </span>
         </div>
       </div>
     </div>
   );
 }
-

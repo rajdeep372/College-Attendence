@@ -320,7 +320,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
             </span>
           </label>
 
-          <div className="relative max-w-xs">
+          <div className="relative max-w-xs z-10">
             <input
               type="text"
               maxLength={4}
@@ -330,7 +330,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
               disabled={isSubmitting || isLocating}
-              className="w-full tracking-[0.75em] text-center text-3xl sm:text-4xl font-mono font-extrabold px-6 py-4 rounded-2xl bg-slate-950/80 border-2 border-sky-500/40 focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-500/20 text-white placeholder-slate-700 shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition-all"
+              className="w-full tracking-[0.75em] text-center text-3xl sm:text-4xl font-mono font-extrabold px-6 py-4 rounded-2xl bg-white/90 dark:bg-slate-950/80 border-2 border-sky-500/40 focus:border-sky-500 dark:focus:border-sky-400 focus:outline-none focus:ring-4 focus:ring-sky-500/20 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-700 shadow-inner transition-all"
             />
             {pin.length === 4 && (
               <div className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">

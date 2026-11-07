@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
@@ -18,6 +19,14 @@ import {
 
 async function HodDashboardContent() {
   const currentUser = await getCurrentUser();
+
+  if (!currentUser) {
+    redirect("/sign-in");
+  }
+
+  if (currentUser.role.toLowerCase() !== "hod") {
+    redirect(`/dashboard/${currentUser.role.toLowerCase()}`);
+  }
 
   const departmentStats = [
     { label: "Branch Attendance", value: "96.4%", sub: "Computer Science Dept", icon: UserCheck, color: "from-blue-500 to-indigo-600" },
@@ -40,7 +49,7 @@ async function HodDashboardContent() {
 
         {/* Welcome Banner */}
         <div className="relative p-6 sm:p-8 rounded-3xl glass-card border border-blue-500/30 overflow-hidden">
-          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-blue-600/20 blur-3xl" />
+          <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-blue-600/20 blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-300 border border-blue-500/20 mb-3">
