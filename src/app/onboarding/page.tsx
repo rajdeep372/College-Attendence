@@ -3,18 +3,15 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
+import { determineUserRole } from "@/lib/server-rbac";
 import { 
-  validateInstitutionalEmail, 
-  deriveRoleFromEmail, 
   deriveDepartment,
   deriveRollNumber,
-  getRoleDashboardPath,
+  getRoleDashboardPath, 
   isPrincipalSuperAdmin,
   isPersonalEmail,
-  STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
-import { AlertTriangle, GraduationCap, Lock } from "lucide-react";
-import { SignOutButton } from "@clerk/nextjs";
+import { GraduationCap } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { InstallPwaPrompt } from "@/components/pwa/InstallPwaPrompt";
 
@@ -27,8 +24,6 @@ export default async function OnboardingPage() {
   }
 
   const primaryEmail = clerkUser.emailAddresses?.[0]?.emailAddress || "";
-  const isPersonal = isPersonalEmail(primaryEmail);
-  const isSuperAdmin = isPrincipalSuperAdmin(primaryEmail);
 
   // Check if user has already completed onboarding
   const dbUser = await getCurrentUser();
@@ -37,16 +32,12 @@ export default async function OnboardingPage() {
     redirect(targetDashboard);
   }
 
-  // Derive initial values for onboarding form
-  const derivedRole = isSuperAdmin
-    ? "Principal"
-    : isPersonal
-    ? "Principal"
-    : deriveRoleFromEmail(primaryEmail);
+  // Strictly determine role from backend whitelist
+  const serverAssignedRole = await determineUserRole(primaryEmail);
 
   const derivedDepartment =
-    dbUser?.department || (derivedRole === "Principal" ? "Office of the Principal & Institutional Affairs" : deriveDepartment(primaryEmail));
-  const derivedRoll = dbUser?.rollNumber || deriveRollNumber(primaryEmail, derivedRole);
+    dbUser?.department || (serverAssignedRole === "Principal" ? "Office of the Principal & Institutional Affairs" : deriveDepartment(primaryEmail));
+  const derivedRoll = dbUser?.rollNumber || deriveRollNumber(primaryEmail, serverAssignedRole);
   const fullName = dbUser?.name || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "";
 
   return (
@@ -80,7 +71,7 @@ export default async function OnboardingPage() {
         <OnboardingForm
           initialEmail={primaryEmail}
           initialName={fullName}
-          initialRole={derivedRole}
+          initialRole={serverAssignedRole}
           initialDepartment={derivedDepartment}
           initialRoll={derivedRoll}
         />
@@ -92,4 +83,3 @@ export default async function OnboardingPage() {
     </div>
   );
 }
-

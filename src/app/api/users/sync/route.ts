@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { UserRole } from "@/models/User";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
+import { determineUserRole } from "@/lib/server-rbac";
 import { 
   validateInstitutionalEmail, 
   deriveRoleFromEmail, 
@@ -85,16 +86,15 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
-    // Dynamic role, department, and roll number derivation
-    const autoAssignedRole: UserRole =
-      bodyData.role || (emailValidation.role as UserRole) || deriveRoleFromEmail(email);
+    // Backend-Enforced Zero-Trust Role Determination (Client roles are rejected)
+    const autoAssignedRole: UserRole = await determineUserRole(email);
     const department = deriveDepartment(email, metaDept);
     const rollNumber = deriveRollNumber(email, autoAssignedRole, metaRoll);
     const phone = bodyData.phone || "";
 
     const finalDepartment = (existing?.onboarded && existing.department) ? existing.department : department;
     const finalRollNumber = (existing?.onboarded && existing.rollNumber) ? existing.rollNumber : rollNumber;
-    const finalRole = (existing?.onboarded && existing.role) ? existing.role : autoAssignedRole;
+    const finalRole = autoAssignedRole;
 
     // Upsert User in MongoDB with exact institutional credentials
     const syncedUser = await User.findOneAndUpdate(
@@ -115,6 +115,19 @@ export async function POST(req: NextRequest) {
         setDefaultsOnInsert: true,
       }
     );
+
+    // Secure Clerk Sync: update Clerk publicMetadata.role
+    try {
+      const client = await clerkClient();
+      await client.users.updateUserMetadata(clerkId, {
+        publicMetadata: {
+          role: finalRole,
+          department: finalDepartment,
+        },
+      });
+    } catch (clerkSyncErr) {
+      console.warn("[API: users/sync] Clerk sync warning:", clerkSyncErr);
+    }
 
     return NextResponse.json(
       {

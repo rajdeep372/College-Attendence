@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { UserRole } from "@/models/User";
 import Routine from "@/models/Routine";
-import { currentUser } from "@clerk/nextjs/server";
+import AuthorizedStaff from "@/models/AuthorizedStaff";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { 
-  validateInstitutionalEmail, 
-  deriveRoleFromEmail, 
-  getRoleDashboardPath,
+  getRoleDashboardPath, 
+  isPersonalEmail, 
   isPrincipalSuperAdmin,
-  isPersonalEmail,
   STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
+import { determineUserRole, isWhitelistedStaff } from "@/lib/server-rbac";
 
 export async function GET() {
   try {
@@ -22,21 +22,26 @@ export async function GET() {
     }
 
     const email = clerkUser.emailAddresses?.[0]?.emailAddress || "";
-    const isGodMode = isPrincipalSuperAdmin(email);
-    let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
-    const validation = validateInstitutionalEmail(
-      email,
-      (dbUser?.role as any) || (isGodMode ? "Principal" : undefined)
-    );
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // 1. Backend-Enforced Zero-Trust Role Determination
+    const assignedRole: UserRole = await determineUserRole(normalizedEmail);
+    const isPersonal = isPersonalEmail(normalizedEmail);
+    const isWhitelisted = await isWhitelistedStaff(normalizedEmail);
+    const isBlocked = isPersonal && assignedRole !== "Principal" && !isWhitelisted;
+
+    const dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
+    const isSupremePrincipal = normalizedEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(normalizedEmail);
 
     return NextResponse.json({
       success: true,
       email,
-      isPersonal: isPersonalEmail(email),
-      validation,
-      onboarded: isGodMode || Boolean(dbUser?.onboarded),
+      assignedRole,
+      isPersonal,
+      isBlocked,
+      onboarded: isSupremePrincipal ? true : Boolean(dbUser?.onboarded),
       user: dbUser,
-      targetDashboard: isGodMode ? "/dashboard/principal" : undefined,
+      targetDashboard: getRoleDashboardPath(assignedRole),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Error querying onboarding state";
@@ -57,10 +62,45 @@ export async function POST(req: NextRequest) {
     }
 
     const email = clerkUser.emailAddresses?.[0]?.emailAddress || "";
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // =========================================================================
+    // STRICT ZERO-TRUST BACKEND-ENFORCED RBAC
+    // 1. Principal Hardcode: strictly check if email matches chatterjeer477@gmail.com
+    // 2. AuthorizedStaff Whitelist: query AuthorizedStaff collection for non-principals
+    // 3. Default Student Fallback: automatically & permanently assign 'Student' role
+    // =========================================================================
+    let finalRole: UserRole = "Student";
+
+    if (normalizedEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(normalizedEmail)) {
+      finalRole = "Principal";
+    } else {
+      const staff = await AuthorizedStaff.findOne({ email: normalizedEmail }).lean();
+      if (staff && staff.role && ["Teacher", "HOD", "Principal"].includes(staff.role)) {
+        finalRole = staff.role as UserRole;
+      } else {
+        finalRole = "Student";
+      }
+    }
+
+    // Strict Role-Based Institutional Email Validation:
+    // Personal emails (@gmail.com, etc.) are strictly prohibited for non-whitelisted accounts
+    const isPersonal = isPersonalEmail(normalizedEmail);
+    const isWhitelisted = await isWhitelistedStaff(normalizedEmail);
+
+    if (isPersonal && finalRole !== "Principal" && !isWhitelisted) {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: STRICT_SSO_ERROR_MESSAGE,
+        },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const {
       name,
-      role: requestedRole,
       department,
       rollNumber,
       batchDuration,
@@ -71,37 +111,6 @@ export async function POST(req: NextRequest) {
       phone = "",
       claimedFacultyName,
     } = body;
-
-    // Determine final role based on user selection or credentials
-    let finalRole: UserRole = "Student";
-    if (requestedRole === "Principal" || isPrincipalSuperAdmin(email)) {
-      finalRole = "Principal";
-    } else if (
-      requestedRole === "HOD" ||
-      (designation && designation.toLowerCase().includes("head of department"))
-    ) {
-      finalRole = "HOD";
-    } else if (requestedRole === "Teacher") {
-      finalRole = "Teacher";
-    } else if (requestedRole === "Student") {
-      finalRole = "Student";
-    } else {
-      finalRole = deriveRoleFromEmail(email);
-    }
-
-    // Strict Role-Based Institutional Email Validation:
-    // Teachers and Students MUST use official college domains.
-    // Personal emails (@gmail.com, etc.) are allowed ONLY for Principal role.
-    const emailValidation = validateInstitutionalEmail(email, finalRole);
-    if (!emailValidation.valid) {
-      return NextResponse.json(
-        { 
-          success: false, 
-          error: emailValidation.error || STRICT_SSO_ERROR_MESSAGE,
-        },
-        { status: 403 }
-      );
-    }
 
     if (!department || !department.trim()) {
       return NextResponse.json(
@@ -133,19 +142,25 @@ export async function POST(req: NextRequest) {
       ? (section.toString().toUpperCase().startsWith("SECTION") ? section.toString().trim() : `Section ${section.toString().trim().toUpperCase()}`)
       : "";
 
+    const cleanDesignation = finalRole === "Principal"
+      ? "Principal (Admin)"
+      : finalRole !== "Student"
+      ? designation.trim() || (finalRole === "HOD" ? "Head of Department (HOD)" : "Faculty Instructor")
+      : "";
+
     const updatePayload: Record<string, unknown> = {
       clerkId: clerkUser.id,
       name: fullName,
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       phone: phone.trim(),
       role: finalRole,
       department: department.trim(),
-      rollNumber: finalRole === "Student" ? rollNumber.trim().toUpperCase() : (rollNumber || "").trim().toUpperCase(),
+      rollNumber: finalRole === "Student" ? rollNumber.trim().toUpperCase() : (finalRole === "Principal" ? "ADM-PRIN" : (rollNumber || "").trim().toUpperCase()),
       batchDuration: finalRole === "Student" ? (batchDuration || "2024-2028").trim() : undefined,
       academicYear: finalRole === "Student" ? resolvedAcademicYear : undefined,
       semester: finalRole === "Student" ? Math.max(1, Math.min(12, Number(semester) || 1)) : 1,
       section: cleanSection,
-      designation: finalRole !== "Student" ? designation.trim() : "",
+      designation: cleanDesignation,
       onboarded: true,
       profilePicture: clerkUser.imageUrl || "",
     };
@@ -156,11 +171,28 @@ export async function POST(req: NextRequest) {
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
+    // =========================================================================
+    // 5. SECURE CLERK SYNC
+    // Update user's Clerk publicMetadata.role via the backend integration
+    // =========================================================================
+    try {
+      const client = await clerkClient();
+      await client.users.updateUserMetadata(clerkUser.id, {
+        publicMetadata: {
+          role: finalRole,
+          department: department.trim(),
+          ...(finalRole === "Student" && rollNumber ? { rollNumber: rollNumber.trim().toUpperCase() } : {}),
+        },
+      });
+      console.log(`[Clerk Sync] Successfully synced publicMetadata.role='${finalRole}' for Clerk user ${clerkUser.id}`);
+    } catch (clerkSyncErr) {
+      console.warn("[Clerk Sync] Warning: Could not update Clerk publicMetadata:", clerkSyncErr);
+    }
+
     // If teacher/HOD claimed an unassigned routine slot, link matching routine classes
     if (claimedFacultyName && (finalRole === "Teacher" || finalRole === "HOD")) {
       const trimmedClaim = claimedFacultyName.trim();
       try {
-        // 1. Update day-grouped routines
         await Routine.updateMany(
           {
             department: department.trim(),
@@ -178,7 +210,6 @@ export async function POST(req: NextRequest) {
           }
         );
 
-        // 2. Update legacy routine fields if any
         await Routine.updateMany(
           {
             department: department.trim(),
@@ -205,6 +236,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Institutional profile verified and registered into official college ledger.",
       targetDashboard,
+      role: finalRole,
       user: savedUser,
     });
   } catch (error: unknown) {

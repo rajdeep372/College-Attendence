@@ -231,9 +231,9 @@ export function validateInstitutionalEmail(
     : undefined;
 
   // 2. Personal Email Handling:
-  // Standard personal emails (@gmail.com, etc.) allowed ONLY if claiming the 'Principal' role
+  // Personal emails (@gmail.com, etc.) are strictly prohibited unless matching the hardcoded Principal super-admin
   if (isPersonal) {
-    if (normalizedRole === "Principal") {
+    if (isPrincipalSuperAdmin(cleanEmail)) {
       return {
         valid: true,
         domain,
@@ -244,12 +244,12 @@ export function validateInstitutionalEmail(
       };
     }
 
-    // Teachers, HODs, and Students are strictly blocked with the exact error message
+    // All other personal emails are strictly blocked with the exact institutional error message
     return {
       valid: false,
       domain,
       prefix,
-      role: normalizedRole,
+      role: normalizedRole || "Student",
       error: STRICT_SSO_ERROR_MESSAGE,
     };
   }

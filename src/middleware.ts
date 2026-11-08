@@ -31,8 +31,13 @@ export default clerkMiddleware(async (auth, req) => {
     // 1. Strictly route authenticated users away from public pages!
     // Never allow authenticated users to be trapped on public pages, sign-in, or sign-up
     if (session.userId) {
-      const userRole =
-        (session.sessionClaims?.metadata as { role?: string })?.role?.toLowerCase();
+      const claims = session.sessionClaims as Record<string, any> | undefined;
+      const userRole = (
+        claims?.metadata?.role ||
+        claims?.publicMetadata?.role ||
+        claims?.role ||
+        ""
+      )?.toLowerCase();
 
       const isPublicLanding =
         path === "" ||

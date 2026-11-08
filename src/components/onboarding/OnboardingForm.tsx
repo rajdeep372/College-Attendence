@@ -98,10 +98,9 @@ export function OnboardingForm({
   const router = useRouter();
 
   const isPersonal = isPersonalEmail(initialEmail) && !isPrincipalSuperAdmin(initialEmail);
-  const defaultRole: "Student" | "Teacher" | "HOD" | "Principal" =
-    initialRole || (isPersonal ? "Principal" : "Student");
+  const defaultRole: "Student" | "Teacher" | "HOD" | "Principal" = initialRole || "Student";
 
-  const [role, setRole] = useState<"Student" | "Teacher" | "HOD" | "Principal">(defaultRole);
+  const role: "Student" | "Teacher" | "HOD" | "Principal" = defaultRole;
   const isSsoBlocked = isPersonal && role !== "Principal";
 
   const [name, setName] = useState(initialName);
@@ -273,8 +272,8 @@ export function OnboardingForm({
               Consumer accounts (<span className="font-mono text-rose-300 font-bold">{initialEmail}</span>) cannot be enrolled as a <strong>{role}</strong>. Faculty and students must authenticate via official institutional credentials.
             </p>
             <div className="pt-2 text-[11px] text-amber-300 flex items-center gap-1.5 font-medium border-t border-rose-500/20">
-              <School className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>To test or manage the system with this personal email, switch your role to <strong>Principal (Admin)</strong>.</span>
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+              <span>Only the authorized Principal (chatterjeer477@gmail.com) and whitelisted staff may authenticate with personal accounts.</span>
             </div>
           </div>
         </div>
@@ -345,56 +344,53 @@ export function OnboardingForm({
           </div>
         </div>
 
-        {/* Institutional Role Selector */}
+        {/* Backend-Assigned Institutional Role (Zero-Trust RBAC - Read Only) */}
         <div>
           <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
-            <span>Institutional Role</span>
-            {isPersonal && (
-              <span className="text-[10px] text-amber-400 font-medium">
-                Personal email allowed for Principal only
-              </span>
-            )}
+            <span>Assigned Institutional Role</span>
+            <span className="text-[10px] text-emerald-400 font-mono font-semibold flex items-center gap-1">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Backend-Enforced Role</span>
+            </span>
           </label>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-            {[
-              { id: "Student", label: "Student", icon: GraduationCap },
-              { id: "Teacher", label: "Faculty / Teacher", icon: Briefcase },
-              { id: "HOD", label: "Head of Dept (HOD)", icon: ShieldCheck },
-              { id: "Principal", label: "Principal (Admin)", icon: School },
-            ].map((r) => {
-              const Icon = r.icon;
-              const isSelected = role === r.id;
-              const isBlocked = isPersonal && r.id !== "Principal";
-              return (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => {
-                    setRole(r.id as any);
-                    if (isPersonal && r.id !== "Principal") {
-                      setErrorMessage(STRICT_SSO_ERROR_MESSAGE);
-                    } else {
-                      setErrorMessage(null);
-                    }
-                  }}
-                  className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1.5 font-semibold transition-all cursor-pointer pointer-events-auto relative ${
-                    isSelected
-                      ? isBlocked
-                        ? "bg-rose-500/20 border-rose-500 text-rose-200 shadow-[0_0_20px_rgba(244,63,94,0.3)]"
-                        : "bg-sky-500/20 border-sky-400 text-sky-200 shadow-[0_0_20px_rgba(56,189,248,0.25)]"
-                      : isBlocked
-                      ? "bg-slate-950/60 border-rose-500/20 text-rose-400/70 hover:text-rose-300 hover:border-rose-500/40"
-                      : "bg-slate-950/60 border-white/10 text-slate-400 hover:text-white hover:bg-slate-900"
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span className="text-xs text-center">{r.label}</span>
-                  {isBlocked && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-950" />
-                  )}
-                </button>
-              );
-            })}
+          <div className="p-3.5 rounded-xl bg-slate-950/80 border border-sky-500/30 flex items-center justify-between shadow-inner">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30">
+                {role === "Principal" ? (
+                  <School className="w-5 h-5 text-amber-400" />
+                ) : role === "HOD" ? (
+                  <ShieldCheck className="w-5 h-5 text-purple-400" />
+                ) : role === "Teacher" ? (
+                  <Briefcase className="w-5 h-5 text-emerald-400" />
+                ) : (
+                  <GraduationCap className="w-5 h-5 text-sky-400" />
+                )}
+              </div>
+              <div>
+                <span className="text-sm sm:text-base font-extrabold text-white block">
+                  {role === "Principal"
+                    ? "Principal (Admin)"
+                    : role === "HOD"
+                    ? "Head of Department (HOD)"
+                    : role === "Teacher"
+                    ? "Faculty / Teacher"
+                    : "Student"}
+                </span>
+                <span className="text-[10px] text-slate-400">
+                  {role === "Principal"
+                    ? "Institutional Leadership & Super-Admin Authority"
+                    : role === "HOD" || role === "Teacher"
+                    ? "Authorized Teaching Staff Whitelist"
+                    : "Enrolled Academic Scholar"}
+                </span>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <span className="px-3 py-1 rounded-full text-[10px] font-mono font-bold bg-sky-500/10 text-sky-300 border border-sky-500/25">
+                Role Locked
+              </span>
+            </div>
           </div>
         </div>
 

@@ -1,11 +1,11 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { IUser, UserRole } from "@/models/User";
+import { determineUserRole } from "@/lib/server-rbac";
 import { 
   validateInstitutionalEmail, 
-  deriveRoleFromEmail,
   deriveDepartment,
   deriveRollNumber,
   isPrincipalSuperAdmin,
@@ -67,32 +67,25 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       clerkUser.username ||
       "Academic Scholar";
 
-    // Validate institutional email
-    const emailValidation = validateInstitutionalEmail(primaryEmail);
-    const derivedRole: UserRole = emailValidation.valid && emailValidation.role
-      ? emailValidation.role
-      : deriveRoleFromEmail(primaryEmail);
+    // Strictly determine role from backend whitelist
+    const serverAssignedRole: UserRole = await determineUserRole(primaryEmail);
 
     const metaDept = (clerkUser.publicMetadata as { department?: string })?.department;
     const metaRoll = (clerkUser.publicMetadata as { rollNumber?: string })?.rollNumber;
 
     const dynamicDepartment = deriveDepartment(primaryEmail, metaDept);
-    const dynamicRoll = deriveRollNumber(primaryEmail, derivedRole, metaRoll);
+    const dynamicRoll = deriveRollNumber(primaryEmail, serverAssignedRole, metaRoll);
 
     // Query user by clerkId
     let dbUser = await User.findOne({ clerkId: clerkUser.id }).lean<IUser>();
 
-    const isGodMode = isPrincipalSuperAdmin(primaryEmail);
-    const isPersonal = isPersonalEmail(primaryEmail);
+    const isGodMode = primaryEmail.toLowerCase().trim() === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(primaryEmail);
 
     // If user not in MongoDB yet, auto-provision with derived credentials
-    // Note: Personal emails are restricted to Principal role exclusively for testing/management
     if (!dbUser) {
-      const initialRole: UserRole = isGodMode || isPersonal ? "Principal" : derivedRole;
+      const initialRole: UserRole = serverAssignedRole;
       const initialDept = isGodMode
         ? "Executive Institutional Leadership"
-        : isPersonal
-        ? "Office of the Principal & Institutional Affairs"
         : dynamicDepartment;
 
       const newUser = await User.create({
@@ -101,23 +94,39 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
         email: primaryEmail.toLowerCase().trim(),
         role: initialRole,
         department: initialDept,
-        rollNumber: isGodMode ? "ADM-PRIN-SUPERADMIN" : isPersonal ? `ADM-PRIN-${new Date().getFullYear()}` : dynamicRoll,
-        designation: isGodMode ? "Supreme Principal Super-Admin" : isPersonal ? "Principal / Super-Admin" : "",
+        rollNumber: isGodMode ? "ADM-PRIN-SUPERADMIN" : dynamicRoll,
+        designation: isGodMode ? "Principal (Admin)" : initialRole === "HOD" ? "Head of Department (HOD)" : initialRole === "Teacher" ? "Faculty Instructor" : "",
         onboarded: isGodMode ? true : false,
         profilePicture: clerkUser.imageUrl || "",
       });
 
       dbUser = newUser.toObject();
+
+      // Secure Clerk Sync: update Clerk publicMetadata.role
+      try {
+        const client = await clerkClient();
+        await client.users.updateUserMetadata(clerkUser.id, {
+          publicMetadata: {
+            role: initialRole,
+            department: initialDept,
+          },
+        });
+      } catch (clerkErr) {
+        console.warn("[getCurrentUser] Clerk metadata sync warning:", clerkErr);
+      }
     } else {
-      // If user had outdated fallback department or missing roll number, update with real values
+      // If existing user role deviates from whitelist, forcefully correct it!
       let needsUpdate = false;
       const updatePayload: Record<string, unknown> = {};
 
       if (isGodMode && (dbUser.role !== "Principal" || !dbUser.onboarded)) {
         updatePayload.role = "Principal";
         updatePayload.department = "Executive Institutional Leadership";
-        updatePayload.designation = "Supreme Principal Super-Admin";
+        updatePayload.designation = "Principal (Admin)";
         updatePayload.onboarded = true;
+        needsUpdate = true;
+      } else if (!isGodMode && dbUser.role !== serverAssignedRole) {
+        updatePayload.role = serverAssignedRole;
         needsUpdate = true;
       }
 
@@ -129,14 +138,22 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
         updatePayload.department = metaDept;
         needsUpdate = true;
       }
-      if (!isGodMode && !isPersonal && !dbUser.onboarded && dbUser.role !== derivedRole && derivedRole !== "Student") {
-        updatePayload.role = derivedRole;
-        needsUpdate = true;
-      }
 
       if (needsUpdate) {
         await User.updateOne({ _id: dbUser._id }, { $set: updatePayload });
         dbUser = { ...dbUser, ...updatePayload } as IUser;
+
+        // Secure Clerk Sync for existing user
+        try {
+          const client = await clerkClient();
+          await client.users.updateUserMetadata(clerkUser.id, {
+            publicMetadata: {
+              role: (updatePayload.role as string) || dbUser.role,
+            },
+          });
+        } catch (clerkErr) {
+          console.warn("[getCurrentUser] Clerk metadata update warning:", clerkErr);
+        }
       }
     }
 
