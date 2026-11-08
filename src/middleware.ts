@@ -39,23 +39,31 @@ export default clerkMiddleware(async (auth, req) => {
         ""
       )?.toLowerCase();
 
-      const isPublicLanding =
-        path === "" ||
-        path === "/" ||
-        path.startsWith("/sign-in") ||
-        path.startsWith("/sign-up");
+      // If user has a verified role in Clerk metadata, route directly to role dashboard
+      // Never show public landing, sign-in, sign-up, or onboarding screen again on subsequent visits!
+      if (userRole && ["principal", "hod", "teacher", "student"].includes(userRole)) {
+        const isLandingOrOnboarding =
+          path === "" ||
+          path === "/" ||
+          path.startsWith("/sign-in") ||
+          path.startsWith("/sign-up") ||
+          path.startsWith("/onboarding") ||
+          path === "/dashboard" ||
+          path === "/dashboard/";
 
-      if (isPublicLanding) {
-        if (userRole && ["principal", "hod", "teacher", "student"].includes(userRole)) {
+        if (isLandingOrOnboarding) {
           return NextResponse.redirect(new URL(`/dashboard/${userRole}`, req.url));
         }
-        return NextResponse.redirect(new URL("/dashboard", req.url));
-      }
+      } else {
+        // Fallback for authenticated users without metadata role yet
+        const isPublicLanding =
+          path === "" ||
+          path === "/" ||
+          path.startsWith("/sign-in") ||
+          path.startsWith("/sign-up");
 
-      // If user accesses root /dashboard or /dashboard/
-      if (path === "/dashboard" || path === "/dashboard/") {
-        if (userRole && ["principal", "hod", "teacher", "student"].includes(userRole)) {
-          return NextResponse.redirect(new URL(`/dashboard/${userRole}`, req.url));
+        if (isPublicLanding) {
+          return NextResponse.redirect(new URL("/dashboard", req.url));
         }
       }
 

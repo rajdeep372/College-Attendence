@@ -4,6 +4,7 @@ import AuthorizedStaff from "@/models/AuthorizedStaff";
 import User from "@/models/User";
 import { currentUser } from "@clerk/nextjs/server";
 import { isPrincipalSuperAdmin } from "@/lib/auth-rbac";
+import { normalizeStaffRole } from "@/lib/server-rbac";
 
 export async function GET() {
   try {
@@ -72,9 +73,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!role || !["Teacher", "HOD", "Principal"].includes(role)) {
+    const normalizedRoleInfo = normalizeStaffRole(role);
+    if (!role || normalizedRoleInfo.role === "Student") {
       return NextResponse.json(
-        { success: false, error: "Role must be 'Teacher', 'HOD', or 'Principal'." },
+        { success: false, error: "Role must be 'Teacher', 'Faculty', 'HOD', or 'Principal'." },
         { status: 400 }
       );
     }

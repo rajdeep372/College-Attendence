@@ -78,6 +78,7 @@ interface OnboardingFormProps {
   initialEmail: string;
   initialName?: string;
   initialRole?: "Student" | "Teacher" | "HOD" | "Principal";
+  initialDisplayRole?: string;
   initialDepartment?: string;
   initialRoll?: string;
 }
@@ -92,29 +93,82 @@ export function OnboardingForm({
   initialEmail,
   initialName = "",
   initialRole,
+  initialDisplayRole,
   initialDepartment = "Computer Science & Engineering (CSE)",
   initialRoll = "",
 }: OnboardingFormProps) {
   const router = useRouter();
 
-  const isPersonal = isPersonalEmail(initialEmail) && !isPrincipalSuperAdmin(initialEmail);
-  const defaultRole: "Student" | "Teacher" | "HOD" | "Principal" = initialRole || "Student";
+  const [isVerifyingCredentials, setIsVerifyingCredentials] = useState(true);
+  const [role, setRole] = useState<"Student" | "Teacher" | "HOD" | "Principal">(initialRole || "Student");
+  const [displayRole, setDisplayRole] = useState<string>(
+    initialDisplayRole || (initialRole === "Principal" ? "Principal" : initialRole || "Student")
+  );
+  const [isWhitelistedStaff, setIsWhitelistedStaff] = useState<boolean>(
+    initialRole === "Teacher" || initialRole === "HOD" || initialRole === "Principal"
+  );
 
-  const role: "Student" | "Teacher" | "HOD" | "Principal" = defaultRole;
-  const isSsoBlocked = isPersonal && role !== "Principal";
+  const isPersonal = isPersonalEmail(initialEmail) && !isPrincipalSuperAdmin(initialEmail);
+  const isSsoBlocked = isPersonal && role !== "Principal" && !isWhitelistedStaff;
 
   const [name, setName] = useState(initialName);
   const [rollNumber, setRollNumber] = useState(initialRoll);
   const [department, setDepartment] = useState(
-    defaultRole === "Principal" ? "Office of the Principal & Institutional Affairs" : initialDepartment
+    (initialRole || "Student") === "Principal"
+      ? "Office of the Principal & Institutional Affairs"
+      : initialDepartment
   );
   const [academicYear, setAcademicYear] = useState<string>("3rd Year");
   const [semester, setSemester] = useState<number>(5);
   const [section, setSection] = useState<string>("Section A");
   const [batchDuration, setBatchDuration] = useState<string>("2024-2028");
   const [designation, setDesignation] = useState(
-    defaultRole === "Principal" ? "Principal / Super-Admin" : "Assistant Professor"
+    (initialRole || "Student") === "Principal"
+      ? "Principal / Super-Admin"
+      : "Assistant Professor"
   );
+
+  // Verification on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function verifyInstitutionalCredentials() {
+      try {
+        const res = await fetch("/api/onboarding");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!isMounted) return;
+
+        if (data.onboarded && data.targetDashboard) {
+          router.replace(data.targetDashboard);
+          return;
+        }
+
+        if (data.assignedRole) {
+          setRole(data.assignedRole);
+          setDisplayRole(data.displayRole || (data.assignedRole === "Principal" ? "Principal" : data.assignedRole));
+          setIsWhitelistedStaff(Boolean(data.isWhitelisted || data.assignedRole !== "Student"));
+
+          if (data.assignedRole === "Principal") {
+            setDepartment("Office of the Principal & Institutional Affairs");
+            setDesignation("Principal / Super-Admin");
+          } else if (data.user?.department) {
+            setDepartment(data.user.department);
+          }
+        }
+      } catch (err) {
+        console.warn("Error verifying institutional credentials:", err);
+      } finally {
+        if (isMounted) {
+          setIsVerifyingCredentials(false);
+        }
+      }
+    }
+
+    verifyInstitutionalCredentials();
+    return () => {
+      isMounted = false;
+    };
+  }, [router]);
 
   // Faculty Routine Claiming state
   const [unclaimedSlots, setUnclaimedSlots] = useState<UnclaimedProfile[]>([]);
@@ -231,6 +285,38 @@ export function OnboardingForm({
       setIsSubmitting(false);
     }
   };
+
+  if (isVerifyingCredentials) {
+    return (
+      <div className="w-full max-w-md mx-auto p-8 rounded-3xl glass-card border border-sky-500/30 shadow-[0_20px_50px_rgba(2,132,199,0.25)] relative overflow-hidden text-white text-center animate-fade-in">
+        <div className="absolute -top-20 -right-20 w-60 h-60 rounded-full bg-sky-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-60 h-60 rounded-full bg-blue-600/15 blur-3xl pointer-events-none" />
+
+        <div className="relative z-10 flex flex-col items-center justify-center py-8 space-y-4">
+          <div className="relative">
+            <div className="w-16 h-16 rounded-2xl bg-sky-500/10 border border-sky-400/30 flex items-center justify-center text-sky-400 shadow-inner">
+              <ShieldCheck className="w-8 h-8 animate-pulse text-sky-400" />
+            </div>
+            <Loader2 className="w-6 h-6 animate-spin text-sky-300 absolute -bottom-1 -right-1" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-bold text-white tracking-tight">
+              Verifying Institutional Credentials...
+            </h3>
+            <p className="text-xs text-slate-300 max-w-xs mx-auto">
+              Querying institutional whitelist and configuring zero-trust role permissions for{" "}
+              <span className="font-mono text-sky-300 font-semibold">{initialEmail}</span>
+            </p>
+          </div>
+
+          <div className="w-full max-w-xs bg-slate-900/80 rounded-full h-1.5 overflow-hidden border border-white/5 mt-2">
+            <div className="h-full bg-gradient-to-r from-sky-500 to-blue-500 rounded-full animate-pulse" />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 sm:p-8 rounded-3xl glass-card border border-sky-500/30 shadow-[0_20px_50px_rgba(2,132,199,0.25)] relative overflow-hidden animate-fade-in text-white">
@@ -368,13 +454,13 @@ export function OnboardingForm({
               </div>
               <div>
                 <span className="text-sm sm:text-base font-extrabold text-white block">
-                  {role === "Principal"
-                    ? "Principal (Admin)"
+                  {displayRole || (role === "Principal"
+                    ? "Principal"
                     : role === "HOD"
                     ? "Head of Department (HOD)"
                     : role === "Teacher"
                     ? "Faculty / Teacher"
-                    : "Student"}
+                    : "Student")}
                 </span>
                 <span className="text-[10px] text-slate-400">
                   {role === "Principal"
@@ -636,7 +722,7 @@ export function OnboardingForm({
               </>
             ) : (
               <>
-                <span>Complete Institutional Setup ({role})</span>
+                <span>Complete Institutional Setup ({displayRole || role})</span>
                 <ArrowRight className="w-5 h-5" />
               </>
             )}

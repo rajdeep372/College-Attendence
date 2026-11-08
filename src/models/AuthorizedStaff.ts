@@ -2,7 +2,7 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 
 export interface IAuthorizedStaff extends Document {
   email: string;
-  role: "Teacher" | "HOD" | "Principal";
+  role: string;
   name?: string;
   department?: string;
   createdAt: Date;
@@ -22,10 +22,6 @@ const AuthorizedStaffSchema = new Schema<IAuthorizedStaff>(
     role: {
       type: String,
       required: [true, "Authorized staff role is required"],
-      enum: {
-        values: ["Teacher", "HOD", "Principal"],
-        message: "{VALUE} is not a valid staff role",
-      },
       trim: true,
     },
     name: {
@@ -41,12 +37,12 @@ const AuthorizedStaffSchema = new Schema<IAuthorizedStaff>(
   },
   {
     timestamps: true,
+    collection: "authorizedstaffs",
   }
 );
 
 const AuthorizedStaff: Model<IAuthorizedStaff> =
   mongoose.models.AuthorizedStaff ||
-  mongoose.model<IAuthorizedStaff>("AuthorizedStaff", AuthorizedStaffSchema);
+  mongoose.model<IAuthorizedStaff>("AuthorizedStaff", AuthorizedStaffSchema, "authorizedstaffs");
 
 export default AuthorizedStaff;
-

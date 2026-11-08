@@ -10,7 +10,7 @@ import {
   isPrincipalSuperAdmin,
   STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
-import { determineUserRole, isWhitelistedStaff } from "@/lib/server-rbac";
+import { resolveInstitutionalRole } from "@/lib/server-rbac";
 
 export async function GET() {
   try {
@@ -25,10 +25,10 @@ export async function GET() {
     const normalizedEmail = email.toLowerCase().trim();
 
     // 1. Backend-Enforced Zero-Trust Role Determination
-    const assignedRole: UserRole = await determineUserRole(normalizedEmail);
+    const roleInfo = await resolveInstitutionalRole(normalizedEmail);
+    const assignedRole: UserRole = roleInfo.role;
     const isPersonal = isPersonalEmail(normalizedEmail);
-    const isWhitelisted = await isWhitelistedStaff(normalizedEmail);
-    const isBlocked = isPersonal && assignedRole !== "Principal" && !isWhitelisted;
+    const isBlocked = isPersonal && assignedRole !== "Principal" && !roleInfo.isWhitelisted;
 
     const dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
     const isSupremePrincipal = normalizedEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(normalizedEmail);
@@ -37,9 +37,11 @@ export async function GET() {
       success: true,
       email,
       assignedRole,
+      displayRole: roleInfo.displayRole,
       isPersonal,
       isBlocked,
-      onboarded: isSupremePrincipal ? true : Boolean(dbUser?.onboarded),
+      isWhitelisted: roleInfo.isWhitelisted,
+      onboarded: Boolean(dbUser?.onboarded),
       user: dbUser,
       targetDashboard: getRoleDashboardPath(assignedRole),
     });
@@ -66,29 +68,16 @@ export async function POST(req: NextRequest) {
 
     // =========================================================================
     // STRICT ZERO-TRUST BACKEND-ENFORCED RBAC
-    // 1. Principal Hardcode: strictly check if email matches chatterjeer477@gmail.com
-    // 2. AuthorizedStaff Whitelist: query AuthorizedStaff collection for non-principals
-    // 3. Default Student Fallback: automatically & permanently assign 'Student' role
+    // 1. Principal Hardcode: chatterjeer477@gmail.com -> Principal
+    // 2. AuthorizedStaff Whitelist: authorizedstaffs DB -> Faculty / Teacher or HOD
+    // 3. Default fallback: -> Student
     // =========================================================================
-    let finalRole: UserRole = "Student";
-
-    if (normalizedEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(normalizedEmail)) {
-      finalRole = "Principal";
-    } else {
-      const staff = await AuthorizedStaff.findOne({ email: normalizedEmail }).lean();
-      if (staff && staff.role && ["Teacher", "HOD", "Principal"].includes(staff.role)) {
-        finalRole = staff.role as UserRole;
-      } else {
-        finalRole = "Student";
-      }
-    }
+    const roleInfo = await resolveInstitutionalRole(normalizedEmail);
+    const finalRole: UserRole = roleInfo.role;
 
     // Strict Role-Based Institutional Email Validation:
-    // Personal emails (@gmail.com, etc.) are strictly prohibited for non-whitelisted accounts
     const isPersonal = isPersonalEmail(normalizedEmail);
-    const isWhitelisted = await isWhitelistedStaff(normalizedEmail);
-
-    if (isPersonal && finalRole !== "Principal" && !isWhitelisted) {
+    if (isPersonal && finalRole !== "Principal" && !roleInfo.isWhitelisted) {
       return NextResponse.json(
         { 
           success: false, 
@@ -172,14 +161,15 @@ export async function POST(req: NextRequest) {
     );
 
     // =========================================================================
-    // 5. SECURE CLERK SYNC
-    // Update user's Clerk publicMetadata.role via the backend integration
+    // 3. IMMUTABLE CLERK METADATA SYNC
+    // Update user's Clerk publicMetadata so subsequent logins route instantly
     // =========================================================================
     try {
       const client = await clerkClient();
       await client.users.updateUserMetadata(clerkUser.id, {
         publicMetadata: {
           role: finalRole,
+          onboarded: true,
           department: department.trim(),
           ...(finalRole === "Student" && rollNumber ? { rollNumber: rollNumber.trim().toUpperCase() } : {}),
         },
@@ -237,6 +227,7 @@ export async function POST(req: NextRequest) {
       message: "Institutional profile verified and registered into official college ledger.",
       targetDashboard,
       role: finalRole,
+      displayRole: roleInfo.displayRole,
       user: savedUser,
     });
   } catch (error: unknown) {

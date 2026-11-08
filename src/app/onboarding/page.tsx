@@ -3,7 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/actions/user.actions";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
-import { determineUserRole } from "@/lib/server-rbac";
+import { determineUserRole, resolveInstitutionalRole } from "@/lib/server-rbac";
 import { 
   deriveDepartment,
   deriveRollNumber,
@@ -33,7 +33,8 @@ export default async function OnboardingPage() {
   }
 
   // Strictly determine role from backend whitelist
-  const serverAssignedRole = await determineUserRole(primaryEmail);
+  const roleInfo = await resolveInstitutionalRole(primaryEmail);
+  const serverAssignedRole = roleInfo.role;
 
   const derivedDepartment =
     dbUser?.department || (serverAssignedRole === "Principal" ? "Office of the Principal & Institutional Affairs" : deriveDepartment(primaryEmail));
@@ -72,6 +73,7 @@ export default async function OnboardingPage() {
           initialEmail={primaryEmail}
           initialName={fullName}
           initialRole={serverAssignedRole}
+          initialDisplayRole={roleInfo.displayRole}
           initialDepartment={derivedDepartment}
           initialRoll={derivedRoll}
         />
