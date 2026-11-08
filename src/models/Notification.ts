@@ -4,7 +4,7 @@ export type NotificationType = "alert" | "success" | "info" | "circular";
 
 export interface INotification extends Document {
   recipientId?: Types.ObjectId | null;
-  targetRole?: "Student" | "Teacher" | "HOD" | "Principal" | "All";
+  targetRole?: "Student" | "Teacher" | "HOD" | "Principal" | "Principal (Admin)" | "Faculty / Teacher" | "Head of Dept (HOD)" | "All" | string;
   targetDepartment?: string;
   excludeUserId?: Types.ObjectId | null;
   title: string;
@@ -28,7 +28,6 @@ const NotificationSchema = new Schema<INotification>(
     },
     targetRole: {
       type: String,
-      enum: ["Student", "Teacher", "HOD", "Principal", "All"],
       default: undefined,
       index: true,
     },

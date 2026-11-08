@@ -1,6 +1,13 @@
 import mongoose, { Schema, Document, Model } from "mongoose";
 
-export type UserRole = "Principal" | "HOD" | "Teacher" | "Student";
+export type UserRole =
+  | "Principal"
+  | "HOD"
+  | "Teacher"
+  | "Student"
+  | "Principal (Admin)"
+  | "Faculty / Teacher"
+  | "Head of Dept (HOD)";
 
 export interface IUser extends Document {
   clerkId: string;
@@ -57,13 +64,10 @@ const UserSchema = new Schema<IUser>(
     },
     role: {
       type: String,
-      enum: {
-        values: ["Principal", "HOD", "Teacher", "Student"],
-        message: "{VALUE} is not a valid institutional role",
-      },
       default: "Student",
       required: true,
       index: true,
+      trim: true,
     },
     department: {
       type: String,

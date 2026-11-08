@@ -32,16 +32,28 @@ export default clerkMiddleware(async (auth, req) => {
     // Never allow authenticated users to be trapped on public pages, sign-in, or sign-up
     if (session.userId) {
       const claims = session.sessionClaims as Record<string, any> | undefined;
-      const userRole = (
+      const rawUserRole = (
         claims?.metadata?.role ||
         claims?.publicMetadata?.role ||
         claims?.role ||
         ""
       )?.toLowerCase();
 
+      // Normalize role to canonical route segment: "principal", "hod", "teacher", "student"
+      let userRole = "";
+      if (rawUserRole.includes("principal") || rawUserRole.includes("admin")) {
+        userRole = "principal";
+      } else if (rawUserRole.includes("hod") || rawUserRole.includes("head")) {
+        userRole = "hod";
+      } else if (rawUserRole.includes("teacher") || rawUserRole.includes("faculty")) {
+        userRole = "teacher";
+      } else if (rawUserRole.includes("student")) {
+        userRole = "student";
+      }
+
       // If user has a verified role in Clerk metadata, route directly to role dashboard
       // Never show public landing, sign-in, sign-up, or onboarding screen again on subsequent visits!
-      if (userRole && ["principal", "hod", "teacher", "student"].includes(userRole)) {
+      if (userRole) {
         const isLandingOrOnboarding =
           path === "" ||
           path === "/" ||

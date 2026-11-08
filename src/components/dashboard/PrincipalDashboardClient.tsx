@@ -7,6 +7,7 @@ import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
 import { RoutineUploadDropzone } from "@/components/routine/RoutineUploadDropzone";
 import { AtRiskStudentsCard } from "@/components/dashboard/AtRiskStudentsCard";
 import { BroadcastCircularModal } from "@/components/modals/BroadcastCircularModal";
+import { StaffAccessManagement } from "@/components/admin/StaffAccessManagement";
 import { 
   Building2, 
   Users, 
@@ -338,6 +339,13 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
             );
           })}
         </div>
+
+        {/* ============================================================== */}
+        {/* STAFF ACCESS MANAGEMENT (ZERO-TRUST WHITELIST BRIDGE)         */}
+        {/* ============================================================== */}
+        <section>
+          <StaffAccessManagement />
+        </section>
 
         {/* ============================================================== */}
         {/* 1. HOD CONTEXT SWITCHER & PROXY COMMAND CONSOLE                */}

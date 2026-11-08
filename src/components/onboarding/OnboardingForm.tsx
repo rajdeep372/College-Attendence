@@ -21,6 +21,7 @@ import {
   Clock,
   AlertTriangle
 } from "lucide-react";
+import { UserRole } from "@/models/User";
 import { 
   isPersonalEmail, 
   isPrincipalSuperAdmin, 
@@ -77,7 +78,7 @@ const DESIGNATIONS = [
 interface OnboardingFormProps {
   initialEmail: string;
   initialName?: string;
-  initialRole?: "Student" | "Teacher" | "HOD" | "Principal";
+  initialRole?: UserRole | string;
   initialDisplayRole?: string;
   initialDepartment?: string;
   initialRoll?: string;
@@ -100,32 +101,37 @@ export function OnboardingForm({
   const router = useRouter();
 
   const [isVerifyingCredentials, setIsVerifyingCredentials] = useState(true);
-  const [role, setRole] = useState<"Student" | "Teacher" | "HOD" | "Principal">(initialRole || "Student");
+  const [role, setRole] = useState<string>(initialRole || "Student");
   const [displayRole, setDisplayRole] = useState<string>(
-    initialDisplayRole || (initialRole === "Principal" ? "Principal" : initialRole || "Student")
+    initialDisplayRole || initialRole || "Student"
   );
   const [isWhitelistedStaff, setIsWhitelistedStaff] = useState<boolean>(
-    initialRole === "Teacher" || initialRole === "HOD" || initialRole === "Principal"
+    initialRole === "Teacher" ||
+    initialRole === "HOD" ||
+    initialRole === "Principal" ||
+    initialRole === "Faculty / Teacher" ||
+    initialRole === "Head of Dept (HOD)" ||
+    initialRole === "Principal (Admin)"
   );
 
+  const isStudent = (role || "").toLowerCase().includes("student");
+  const isPrincipal = (role || "").toLowerCase().includes("principal") || (role || "").toLowerCase().includes("admin");
+  const isTeacherOrHod = !isStudent && !isPrincipal;
+
   const isPersonal = isPersonalEmail(initialEmail) && !isPrincipalSuperAdmin(initialEmail);
-  const isSsoBlocked = isPersonal && role !== "Principal" && !isWhitelistedStaff;
+  const isSsoBlocked = isPersonal && !isPrincipal && !isWhitelistedStaff;
 
   const [name, setName] = useState(initialName);
   const [rollNumber, setRollNumber] = useState(initialRoll);
   const [department, setDepartment] = useState(
-    (initialRole || "Student") === "Principal"
-      ? "Office of the Principal & Institutional Affairs"
-      : initialDepartment
+    isPrincipal ? "Office of the Principal & Institutional Affairs" : initialDepartment
   );
   const [academicYear, setAcademicYear] = useState<string>("3rd Year");
   const [semester, setSemester] = useState<number>(5);
   const [section, setSection] = useState<string>("Section A");
   const [batchDuration, setBatchDuration] = useState<string>("2024-2028");
   const [designation, setDesignation] = useState(
-    (initialRole || "Student") === "Principal"
-      ? "Principal / Super-Admin"
-      : "Assistant Professor"
+    isPrincipal ? "Principal (Admin)" : "Assistant Professor"
   );
 
   // Verification on mount
@@ -145,12 +151,13 @@ export function OnboardingForm({
 
         if (data.assignedRole) {
           setRole(data.assignedRole);
-          setDisplayRole(data.displayRole || (data.assignedRole === "Principal" ? "Principal" : data.assignedRole));
-          setIsWhitelistedStaff(Boolean(data.isWhitelisted || data.assignedRole !== "Student"));
+          setDisplayRole(data.displayRole || data.assignedRole);
+          const isStaff = data.assignedRole !== "Student";
+          setIsWhitelistedStaff(Boolean(data.isWhitelisted || isStaff));
 
-          if (data.assignedRole === "Principal") {
+          if (data.assignedRole.toLowerCase().includes("principal") || data.assignedRole.toLowerCase().includes("admin")) {
             setDepartment("Office of the Principal & Institutional Affairs");
-            setDesignation("Principal / Super-Admin");
+            setDesignation("Principal (Admin)");
           } else if (data.user?.department) {
             setDepartment(data.user.department);
           }
@@ -229,12 +236,12 @@ export function OnboardingForm({
       return;
     }
 
-    if (role === "Student" && !rollNumber.trim()) {
+    if (isStudent && !rollNumber.trim()) {
       setErrorMessage("Roll Number is required to map you to your exact classroom roster.");
       return;
     }
 
-    if (role === "Student" && !batchDuration.trim()) {
+    if (isStudent && !batchDuration.trim()) {
       setErrorMessage("Batch / Course Duration is required for students.");
       return;
     }
@@ -252,15 +259,14 @@ export function OnboardingForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          role,
           department,
-          batchDuration: role === "Student" ? batchDuration.trim() : undefined,
-          academicYear: role === "Student" ? academicYear : undefined,
-          semester: role === "Student" ? Number(semester) : undefined,
-          section: role === "Student" ? section : undefined,
-          rollNumber: role === "Student" ? rollNumber.trim().toUpperCase() : (role === "Principal" ? "ADM-PRIN" : undefined),
-          designation: role === "Principal" ? "Principal / Super-Admin" : (role !== "Student" ? designation : undefined),
-          claimedFacultyName: (role === "Teacher" || role === "HOD") && claimedFacultyName ? claimedFacultyName : undefined,
+          batchDuration: isStudent ? batchDuration.trim() : undefined,
+          academicYear: isStudent ? academicYear : undefined,
+          semester: isStudent ? Number(semester) : undefined,
+          section: isStudent ? section : undefined,
+          rollNumber: isStudent ? rollNumber.trim().toUpperCase() : (isPrincipal ? "ADM-PRIN" : undefined),
+          designation: isPrincipal ? "Principal (Admin)" : (isTeacherOrHod ? designation : undefined),
+          claimedFacultyName: isTeacherOrHod && claimedFacultyName ? claimedFacultyName : undefined,
         }),
       });
 
@@ -275,10 +281,10 @@ export function OnboardingForm({
       );
 
       setTimeout(() => {
-        const dest = data.targetDashboard || (role === "Student" ? "/dashboard/student" : role === "Principal" ? "/dashboard/principal" : "/dashboard/teacher");
+        const dest = data.targetDashboard || (isStudent ? "/dashboard/student" : isPrincipal ? "/dashboard/principal" : "/dashboard/teacher");
         router.push(dest);
         router.refresh();
-      }, 1200);
+      }, 1000);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error saving profile.";
       setErrorMessage(msg);
@@ -442,11 +448,11 @@ export function OnboardingForm({
           <div className="p-3.5 rounded-xl bg-slate-950/80 border border-sky-500/30 flex items-center justify-between shadow-inner">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-sky-500/15 text-sky-400 border border-sky-500/30">
-                {role === "Principal" ? (
+                {isPrincipal ? (
                   <School className="w-5 h-5 text-amber-400" />
-                ) : role === "HOD" ? (
+                ) : (role.includes("HOD") || role.includes("Head")) ? (
                   <ShieldCheck className="w-5 h-5 text-purple-400" />
-                ) : role === "Teacher" ? (
+                ) : (role.includes("Teacher") || role.includes("Faculty")) ? (
                   <Briefcase className="w-5 h-5 text-emerald-400" />
                 ) : (
                   <GraduationCap className="w-5 h-5 text-sky-400" />
@@ -454,18 +460,12 @@ export function OnboardingForm({
               </div>
               <div>
                 <span className="text-sm sm:text-base font-extrabold text-white block">
-                  {displayRole || (role === "Principal"
-                    ? "Principal"
-                    : role === "HOD"
-                    ? "Head of Department (HOD)"
-                    : role === "Teacher"
-                    ? "Faculty / Teacher"
-                    : "Student")}
+                  {displayRole || role}
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  {role === "Principal"
+                  {isPrincipal
                     ? "Institutional Leadership & Super-Admin Authority"
-                    : role === "HOD" || role === "Teacher"
+                    : isTeacherOrHod
                     ? "Authorized Teaching Staff Whitelist"
                     : "Enrolled Academic Scholar"}
                 </span>
@@ -502,7 +502,7 @@ export function OnboardingForm({
         {/* ============================================================== */}
         {/* STUDENT CONDITIONAL PARAMETERS                                 */}
         {/* ============================================================== */}
-        {role === "Student" && (
+        {isStudent && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -619,7 +619,7 @@ export function OnboardingForm({
         {/* ============================================================== */}
         {/* TEACHER / HOD CONDITIONAL FIELDS & ROUTINE CLAIMING            */}
         {/* ============================================================== */}
-        {(role === "Teacher" || role === "HOD") && (
+        {isTeacherOrHod && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -680,7 +680,7 @@ export function OnboardingForm({
         {/* ============================================================== */}
         {/* PRINCIPAL CONDITIONAL FIELDS & SUPERVISION SCOPE              */}
         {/* ============================================================== */}
-        {role === "Principal" && (
+        {isPrincipal && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}

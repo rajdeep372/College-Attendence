@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { UserRole } from "@/models/User";
@@ -28,10 +29,9 @@ export async function GET() {
     const roleInfo = await resolveInstitutionalRole(normalizedEmail);
     const assignedRole: UserRole = roleInfo.role;
     const isPersonal = isPersonalEmail(normalizedEmail);
-    const isBlocked = isPersonal && assignedRole !== "Principal" && !roleInfo.isWhitelisted;
+    const isBlocked = isPersonal && !roleInfo.isWhitelisted;
 
     const dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
-    const isSupremePrincipal = normalizedEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(normalizedEmail);
 
     return NextResponse.json({
       success: true,
@@ -63,21 +63,52 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const email = clerkUser.emailAddresses?.[0]?.emailAddress || "";
-    const normalizedEmail = email.toLowerCase().trim();
+    // 1. Universal Backend Role Resolution (The Gatekeeper)
+    // Ignore any role sent from the frontend. Resolve role strictly on the server:
+    const clerkUserEmail = (clerkUser.emailAddresses?.[0]?.emailAddress || "").toLowerCase().trim();
 
-    // =========================================================================
-    // STRICT ZERO-TRUST BACKEND-ENFORCED RBAC
-    // 1. Principal Hardcode: chatterjeer477@gmail.com -> Principal
-    // 2. AuthorizedStaff Whitelist: authorizedstaffs DB -> Faculty / Teacher or HOD
-    // 3. Default fallback: -> Student
-    // =========================================================================
-    const roleInfo = await resolveInstitutionalRole(normalizedEmail);
-    const finalRole: UserRole = roleInfo.role;
+    let assignedRole: UserRole = "Student";
+
+    // Check 1: If email matches principal, lock assignedRole = 'Principal (Admin)'
+    if (clerkUserEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(clerkUserEmail)) {
+      assignedRole = "Principal (Admin)";
+    } else {
+      // Check 2: Query await mongoose.connection.collection('authorizedstaffs').findOne({ email: clerkUserEmail })
+      const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regexQuery = new RegExp(`^${escapeRegex(clerkUserEmail)}$`, "i");
+
+      let staffDoc = null;
+      if (mongoose.connection?.db) {
+        staffDoc = await mongoose.connection.collection("authorizedstaffs").findOne({
+          $or: [{ email: clerkUserEmail }, { email: regexQuery }],
+        });
+      }
+
+      if (!staffDoc) {
+        staffDoc = await AuthorizedStaff.findOne({
+          $or: [{ email: clerkUserEmail }, { email: regexQuery }],
+        }).lean();
+      }
+
+      if (staffDoc && staffDoc.role) {
+        const rawRole = staffDoc.role.trim();
+        if (rawRole.toLowerCase().includes("hod") || rawRole.toLowerCase().includes("head")) {
+          assignedRole = "Head of Dept (HOD)";
+        } else if (rawRole.toLowerCase().includes("faculty") || rawRole.toLowerCase().includes("teacher")) {
+          assignedRole = "Faculty / Teacher";
+        } else {
+          assignedRole = rawRole as UserRole;
+        }
+      } else {
+        // Check 3: If NO document is found, forcefully and permanently default to 'Student'
+        assignedRole = "Student";
+      }
+    }
 
     // Strict Role-Based Institutional Email Validation:
-    const isPersonal = isPersonalEmail(normalizedEmail);
-    if (isPersonal && finalRole !== "Principal" && !roleInfo.isWhitelisted) {
+    const isPersonal = isPersonalEmail(clerkUserEmail);
+    const isAuthorizedStaffOrPrincipal = assignedRole !== "Student";
+    if (isPersonal && !isAuthorizedStaffOrPrincipal) {
       return NextResponse.json(
         { 
           success: false, 
@@ -108,13 +139,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (finalRole === "Student") {
-      if (!rollNumber || !rollNumber.trim()) {
-        return NextResponse.json(
-          { success: false, error: "Roll Number is strictly required for students." },
-          { status: 400 }
-        );
-      }
+    const isStudent = assignedRole === "Student";
+    const isPrincipal = assignedRole === "Principal (Admin)" || assignedRole === "Principal";
+    const isTeacherOrHod = !isStudent && !isPrincipal;
+
+    if (isStudent && (!rollNumber || !rollNumber.trim())) {
+      return NextResponse.json(
+        { success: false, error: "Roll Number is strictly required for students." },
+        { status: 400 }
+      );
     }
 
     const fullName = name && name.trim()
@@ -122,32 +155,40 @@ export async function POST(req: NextRequest) {
       : `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Academic Scholar";
 
     let resolvedAcademicYear = academicYear;
-    if (!resolvedAcademicYear && finalRole === "Student") {
+    if (!resolvedAcademicYear && isStudent) {
       const semNum = Number(semester) || 1;
       resolvedAcademicYear = semNum <= 2 ? "1st Year" : semNum <= 4 ? "2nd Year" : semNum <= 6 ? "3rd Year" : "4th Year";
     }
 
-    const cleanSection = finalRole === "Student"
+    const cleanSection = isStudent
       ? (section.toString().toUpperCase().startsWith("SECTION") ? section.toString().trim() : `Section ${section.toString().trim().toUpperCase()}`)
       : "";
 
-    const cleanDesignation = finalRole === "Principal"
+    const cleanDesignation = isPrincipal
       ? "Principal (Admin)"
-      : finalRole !== "Student"
-      ? designation.trim() || (finalRole === "HOD" ? "Head of Department (HOD)" : "Faculty Instructor")
+      : isTeacherOrHod
+      ? designation.trim() || (assignedRole === "Head of Dept (HOD)" ? "Head of Department (HOD)" : "Faculty Instructor")
       : "";
 
+    const cleanRoll = isStudent
+      ? rollNumber.trim().toUpperCase()
+      : isPrincipal
+      ? "ADM-PRIN"
+      : (rollNumber || "").trim().toUpperCase();
+
+    // 2. Proper DB Profile Sync (The Connection)
+    // Upsert operational profile into main users MongoDB collection with assignedRole
     const updatePayload: Record<string, unknown> = {
       clerkId: clerkUser.id,
+      email: clerkUserEmail,
       name: fullName,
-      email: normalizedEmail,
       phone: phone.trim(),
-      role: finalRole,
+      role: assignedRole,
       department: department.trim(),
-      rollNumber: finalRole === "Student" ? rollNumber.trim().toUpperCase() : (finalRole === "Principal" ? "ADM-PRIN" : (rollNumber || "").trim().toUpperCase()),
-      batchDuration: finalRole === "Student" ? (batchDuration || "2024-2028").trim() : undefined,
-      academicYear: finalRole === "Student" ? resolvedAcademicYear : undefined,
-      semester: finalRole === "Student" ? Math.max(1, Math.min(12, Number(semester) || 1)) : 1,
+      rollNumber: cleanRoll,
+      batchDuration: isStudent ? (batchDuration || "2024-2028").trim() : undefined,
+      academicYear: isStudent ? resolvedAcademicYear : undefined,
+      semester: isStudent ? Math.max(1, Math.min(12, Number(semester) || 1)) : 1,
       section: cleanSection,
       designation: cleanDesignation,
       onboarded: true,
@@ -156,31 +197,32 @@ export async function POST(req: NextRequest) {
 
     const savedUser = await User.findOneAndUpdate(
       { clerkId: clerkUser.id },
-      { $set: updatePayload },
+      { 
+        $set: updatePayload,
+        $setOnInsert: { createdAt: new Date() },
+      },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    // =========================================================================
-    // 3. IMMUTABLE CLERK METADATA SYNC
-    // Update user's Clerk publicMetadata so subsequent logins route instantly
-    // =========================================================================
+    // 3. Immutable Clerk Sync & Auto-Routing
+    // Update clerkClient.users.updateUserMetadata with publicMetadata: { role: assignedRole }
     try {
       const client = await clerkClient();
       await client.users.updateUserMetadata(clerkUser.id, {
         publicMetadata: {
-          role: finalRole,
+          role: assignedRole,
           onboarded: true,
           department: department.trim(),
-          ...(finalRole === "Student" && rollNumber ? { rollNumber: rollNumber.trim().toUpperCase() } : {}),
+          ...(isStudent && cleanRoll ? { rollNumber: cleanRoll } : {}),
         },
       });
-      console.log(`[Clerk Sync] Successfully synced publicMetadata.role='${finalRole}' for Clerk user ${clerkUser.id}`);
+      console.log(`[Clerk Sync] Successfully synced publicMetadata.role='${assignedRole}' for Clerk user ${clerkUser.id}`);
     } catch (clerkSyncErr) {
       console.warn("[Clerk Sync] Warning: Could not update Clerk publicMetadata:", clerkSyncErr);
     }
 
-    // If teacher/HOD claimed an unassigned routine slot, link matching routine classes
-    if (claimedFacultyName && (finalRole === "Teacher" || finalRole === "HOD")) {
+    // Link routine classes if teacher/HOD claimed an unassigned routine slot
+    if (claimedFacultyName && isTeacherOrHod) {
       const trimmedClaim = claimedFacultyName.trim();
       try {
         await Routine.updateMany(
@@ -213,21 +255,18 @@ export async function POST(req: NextRequest) {
             },
           }
         );
-
-        console.log(`[API: /api/onboarding] Linked unclaimed routine slots for '${trimmedClaim}' to teacher ${savedUser._id} (${savedUser.name}).`);
       } catch (claimErr) {
         console.warn("[API: /api/onboarding] Failed to link routine slots:", claimErr);
       }
     }
 
-    const targetDashboard = getRoleDashboardPath(finalRole);
+    const targetDashboard = getRoleDashboardPath(assignedRole);
 
     return NextResponse.json({
       success: true,
       message: "Institutional profile verified and registered into official college ledger.",
       targetDashboard,
-      role: finalRole,
-      displayRole: roleInfo.displayRole,
+      role: assignedRole,
       user: savedUser,
     });
   } catch (error: unknown) {

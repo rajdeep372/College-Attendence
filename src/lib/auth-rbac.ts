@@ -1,4 +1,11 @@
-export type InstitutionalRole = "Principal" | "HOD" | "Teacher" | "Student";
+export type InstitutionalRole =
+  | "Principal"
+  | "HOD"
+  | "Teacher"
+  | "Student"
+  | "Principal (Admin)"
+  | "Faculty / Teacher"
+  | "Head of Dept (HOD)";
 
 /**
  * Hardcoded Supreme Principal God-Mode Super-Admin email
@@ -144,7 +151,7 @@ export function deriveDepartment(
  */
 export function deriveRollNumber(
   email: string,
-  role: InstitutionalRole,
+  role: InstitutionalRole | string,
   metadataRoll?: string | null
 ): string {
   if (metadataRoll && metadataRoll.trim()) {
@@ -313,15 +320,14 @@ export function deriveRoleFromEmail(email: string): InstitutionalRole {
  */
 export function getRoleDashboardPath(role: InstitutionalRole | string): string {
   const normalized = (role || "").toLowerCase();
-  switch (normalized) {
-    case "principal":
-      return "/dashboard/principal";
-    case "hod":
-      return "/dashboard/hod";
-    case "teacher":
-      return "/dashboard/teacher";
-    case "student":
-    default:
-      return "/dashboard/student";
+  if (normalized.includes("principal") || normalized.includes("admin")) {
+    return "/dashboard/principal";
   }
+  if (normalized.includes("hod") || normalized.includes("head")) {
+    return "/dashboard/hod";
+  }
+  if (normalized.includes("teacher") || normalized.includes("faculty") || normalized.includes("professor")) {
+    return "/dashboard/teacher";
+  }
+  return "/dashboard/student";
 }

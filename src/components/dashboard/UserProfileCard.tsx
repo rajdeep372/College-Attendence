@@ -18,8 +18,12 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
   const department = user?.department || "General Academic & Sciences";
   const profilePicture = user?.profilePicture;
 
-  const roleColors: Record<UserRole, { badge: string; glow: string }> = {
+  const roleColors: Record<string, { badge: string; glow: string }> = {
     Principal: {
+      badge: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+      glow: "rgba(168, 85, 247, 0.35)",
+    },
+    "Principal (Admin)": {
       badge: "bg-purple-500/15 text-purple-300 border-purple-500/30",
       glow: "rgba(168, 85, 247, 0.35)",
     },
@@ -27,7 +31,15 @@ export function UserProfileCard({ user, defaultRole }: UserProfileCardProps) {
       badge: "bg-blue-500/15 text-blue-300 border-blue-500/30",
       glow: "rgba(59, 130, 246, 0.35)",
     },
+    "Head of Dept (HOD)": {
+      badge: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+      glow: "rgba(59, 130, 246, 0.35)",
+    },
     Teacher: {
+      badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+      glow: "rgba(16, 185, 129, 0.35)",
+    },
+    "Faculty / Teacher": {
       badge: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
       glow: "rgba(16, 185, 129, 0.35)",
     },

@@ -119,8 +119,8 @@ export async function getCurrentUser(): Promise<SerializedUser | null> {
       let needsUpdate = false;
       const updatePayload: Record<string, unknown> = {};
 
-      if (isGodMode && (dbUser.role !== "Principal" || !dbUser.onboarded)) {
-        updatePayload.role = "Principal";
+      if (isGodMode && (!dbUser.role?.includes("Principal") || !dbUser.onboarded)) {
+        updatePayload.role = "Principal (Admin)";
         updatePayload.department = "Executive Institutional Leadership";
         updatePayload.designation = "Principal (Admin)";
         updatePayload.onboarded = true;

@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
             { recipientId: dbUser._id },
             {
               recipientId: null,
-              targetRole: { $in: [dbUser.role, "All"] },
+              targetRole: { $in: [dbUser.role as any, "All"] },
               $or: [
                 { targetDepartment: { $exists: false } },
                 { targetDepartment: null },
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
       .limit(20)
       .lean();
 
-    for (const notif of dbNotifications) {
+    for (const notif of (dbNotifications as any[])) {
       const isRead = Boolean(
         notif.isRead ||
         (notif.readBy && notif.readBy.some((id: any) => id.toString() === dbUser._id.toString()))
@@ -171,7 +171,7 @@ export async function PATCH(req: NextRequest) {
         Notification.updateMany(
           {
             recipientId: null,
-            targetRole: { $in: [dbUser.role, "All"] },
+            targetRole: { $in: [dbUser.role as any, "All"] } as any,
           },
           { $addToSet: { readBy: dbUser._id } }
         ),

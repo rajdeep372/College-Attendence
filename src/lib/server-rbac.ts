@@ -20,10 +20,10 @@ export function normalizeStaffRole(rawRole?: string | null): { role: UserRole; d
   const clean = rawRole.trim().toLowerCase();
 
   if (clean.includes("principal") || clean.includes("admin")) {
-    return { role: "Principal", displayRole: "Principal" };
+    return { role: "Principal (Admin)", displayRole: "Principal (Admin)" };
   }
   if (clean.includes("hod") || clean.includes("head")) {
-    return { role: "HOD", displayRole: "Head of Department (HOD)" };
+    return { role: "Head of Dept (HOD)", displayRole: "Head of Dept (HOD)" };
   }
   if (
     clean.includes("teacher") ||
@@ -32,7 +32,7 @@ export function normalizeStaffRole(rawRole?: string | null): { role: UserRole; d
     clean.includes("lecturer") ||
     clean.includes("instructor")
   ) {
-    return { role: "Teacher", displayRole: "Faculty / Teacher" };
+    return { role: "Faculty / Teacher", displayRole: "Faculty / Teacher" };
   }
   return { role: "Student", displayRole: "Student" };
 }
@@ -58,9 +58,9 @@ export async function resolveInstitutionalRole(email?: string | null): Promise<R
   // 1. Principal Hardcode
   if (normalizedEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(normalizedEmail)) {
     return {
-      role: "Principal",
-      displayRole: "Principal",
-      rawRole: "Principal",
+      role: "Principal (Admin)",
+      displayRole: "Principal (Admin)",
+      rawRole: "Principal (Admin)",
       isWhitelisted: true,
     };
   }

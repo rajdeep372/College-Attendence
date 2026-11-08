@@ -69,11 +69,16 @@ export function RoleGuard({ allowedRole, user, children }: RoleGuardProps) {
     );
   }
 
-  // Check case-insensitive match for role ("Teacher" vs "teacher")
+  // Check case-insensitive & substring match for role ("Teacher" vs "Faculty / Teacher", "Principal" vs "Principal (Admin)")
   const userRoleNormalized = (user.role || "").toLowerCase();
   const allowedRoleNormalized = (allowedRole || "").toLowerCase();
 
-  const isAuthorized = userRoleNormalized === allowedRoleNormalized;
+  const isAuthorized =
+    userRoleNormalized === allowedRoleNormalized ||
+    (allowedRoleNormalized === "teacher" && (userRoleNormalized.includes("teacher") || userRoleNormalized.includes("faculty"))) ||
+    (allowedRoleNormalized === "hod" && (userRoleNormalized.includes("hod") || userRoleNormalized.includes("head"))) ||
+    (allowedRoleNormalized === "principal" && (userRoleNormalized.includes("principal") || userRoleNormalized.includes("admin"))) ||
+    (allowedRoleNormalized === "student" && userRoleNormalized.includes("student"));
 
   if (!isAuthorized) {
     return (
