@@ -28,7 +28,7 @@ import {
   Sparkles,
   MapPin
 } from "lucide-react";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser, ClerkLoading, ClerkLoaded } from "@clerk/nextjs";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 
 export interface NavItem {
@@ -257,16 +257,15 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
             </div>
           )}
 
-          {/* User profile & actions */}
+          {/* User profile & actions with Instant Skeleton Loading */}
           <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900/40 border border-white/5">
             <div className="flex items-center gap-2 overflow-hidden">
-              {isSignedIn ? (
+              <ClerkLoading>
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-sky-500/20 animate-pulse shrink-0" />
+              </ClerkLoading>
+              <ClerkLoaded>
                 <UserButton />
-              ) : (
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shrink-0">
-                  {role[0].toUpperCase()}
-                </div>
-              )}
+              </ClerkLoaded>
 
               {!isCollapsed && (
                 <div className="truncate text-left">

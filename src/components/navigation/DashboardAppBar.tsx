@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { InstallPwaPrompt } from "@/components/pwa/InstallPwaPrompt";
-import { UserButton, useUser } from "@clerk/nextjs";
+import { UserButton, useUser, ClerkLoading, ClerkLoaded } from "@clerk/nextjs";
 
 export interface NotificationItem {
   id: string;
@@ -388,18 +388,17 @@ export function DashboardAppBar() {
               </AnimatePresence>
             </div>
 
-            {/* Clerk User Button */}
-            {isSignedIn ? (
-              <div className="p-0.5 rounded-full border border-sky-500/30 shadow-[0_0_12px_rgba(56,189,248,0.25)] shrink-0">
-                <UserButton />
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 pl-2 border-l border-white/10 shrink-0">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]">
-                  AS
+            {/* Clerk User Button with Instant Skeleton to eliminate layout shifts */}
+            <div className="shrink-0 flex items-center pl-1 border-l border-white/10">
+              <ClerkLoading>
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-sky-500/20 animate-pulse" />
+              </ClerkLoading>
+              <ClerkLoaded>
+                <div className="p-0.5 rounded-full border border-sky-500/30 shadow-[0_0_12px_rgba(56,189,248,0.25)] shrink-0">
+                  <UserButton />
                 </div>
-              </div>
-            )}
+              </ClerkLoaded>
+            </div>
           </div>
         </div>
       </header>

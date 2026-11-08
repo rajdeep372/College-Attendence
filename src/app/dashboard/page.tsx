@@ -41,10 +41,6 @@ function DashboardAutoRouter() {
 
         if (data.success && data.onboarded) {
           const role = data.user?.role || (isPersonal ? "Principal" : "Student");
-          if (isPersonal && role !== "Principal") {
-            router.replace("/onboarding");
-            return;
-          }
           const targetPath = getRoleDashboardPath(role);
           router.replace(targetPath);
         } else {

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ClerkProvider } from "@clerk/nextjs";
+import { ClerkProvider, ClerkLoaded, ClerkLoading } from "@clerk/nextjs";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -31,8 +31,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      {children}
+      <ClerkLoading>
+        <div className="fixed inset-0 min-h-screen w-full flex flex-col items-center justify-center bg-slate-950 text-white z-50">
+          <div className="flex flex-col items-center gap-4 p-8 rounded-3xl glass-card border border-sky-500/20 shadow-[0_0_50px_rgba(56,189,248,0.2)] animate-pulse">
+            <div className="relative flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full border-4 border-sky-500/20 border-t-sky-400 animate-spin" />
+            </div>
+            <div className="text-center space-y-1">
+              <div className="text-sm font-extrabold tracking-tight text-white flex items-center justify-center gap-1">
+                <span>Academia</span><span className="text-sky-400">Sync</span>
+              </div>
+              <p className="text-[11px] text-slate-400 font-mono tracking-wide">
+                Verifying Institutional Session...
+              </p>
+            </div>
+          </div>
+        </div>
+      </ClerkLoading>
+      <ClerkLoaded>
+        {children}
+      </ClerkLoaded>
     </ClerkProvider>
   );
 }
-

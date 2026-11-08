@@ -28,34 +28,43 @@ export default clerkMiddleware(async (auth, req) => {
     const session = await auth();
     const path = req.nextUrl.pathname.toLowerCase();
 
-    // 1. Strictly keep authenticated users within their dashboard
-    // Never allow authenticated users to be randomly bounced to the landing page "/"
+    // 1. Strictly route authenticated users away from public pages!
+    // Never allow authenticated users to be trapped on public pages, sign-in, or sign-up
     if (session.userId) {
       const userRole =
         (session.sessionClaims?.metadata as { role?: string })?.role?.toLowerCase();
 
-      // If user hasn't set up role yet, allow direct access to onboarding
-      if (!userRole) {
-        if (path === "/" || path === "" || path === "/dashboard" || path === "/dashboard/") {
-          return NextResponse.redirect(new URL("/onboarding", req.url));
+      const isPublicLanding =
+        path === "" ||
+        path === "/" ||
+        path.startsWith("/sign-in") ||
+        path.startsWith("/sign-up");
+
+      if (isPublicLanding) {
+        if (userRole && ["principal", "hod", "teacher", "student"].includes(userRole)) {
+          return NextResponse.redirect(new URL(`/dashboard/${userRole}`, req.url));
         }
-      } else {
-        if (path === "/" || path === "" || path === "/dashboard" || path === "/dashboard/") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
+
+      // If user accesses root /dashboard or /dashboard/
+      if (path === "/dashboard" || path === "/dashboard/") {
+        if (userRole && ["principal", "hod", "teacher", "student"].includes(userRole)) {
+          return NextResponse.redirect(new URL(`/dashboard/${userRole}`, req.url));
+        }
+      }
+
+      // Cross-role isolation: prevent students/teachers from accessing higher role dashboards
+      if (path.startsWith("/dashboard/")) {
+        const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
+        if (
+          targetRole &&
+          ["principal", "hod", "teacher", "student"].includes(targetRole) &&
+          userRole &&
+          targetRole !== userRole
+        ) {
           const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
           return NextResponse.redirect(redirectUrl);
-        }
-
-        // Cross-role isolation: prevent students/teachers from accessing higher role dashboards
-        if (path.startsWith("/dashboard/")) {
-          const targetRole = path.split("/dashboard/")[1]?.split("/")[0];
-          if (
-            targetRole &&
-            ["principal", "hod", "teacher", "student"].includes(targetRole) &&
-            targetRole !== userRole
-          ) {
-            const redirectUrl = new URL(`/dashboard/${userRole}`, req.url);
-            return NextResponse.redirect(redirectUrl);
-          }
         }
       }
     } else {
