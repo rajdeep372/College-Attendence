@@ -6,6 +6,7 @@ import Notification from "@/models/Notification";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose from "mongoose";
 import nodemailer from "nodemailer";
+import { sendWebPush } from "@/lib/webpush";
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,48 +69,52 @@ export async function POST(req: NextRequest) {
       status: "Pending",
     });
 
-    // Initial Request Routing: Strictly notify HOD & Principal, explicitly EXCLUDING the requesting teacher's userId
+    // Step 2 Requirement: Automatically insert notifications targeted at relevant HOD & Principal
     try {
-      if (applicantRole === "Teacher") {
-        await Notification.create({
-          targetRole: "HOD",
-          targetDepartment: resolvedDepartment,
-          excludeUserId: resolvedApplicantId,
-          title: "Faculty Leave Request",
-          message: `Prof. ${resolvedApplicantName} has requested ${leaveType} leave from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}. Sanction review required.`,
-          type: "info",
-          link: "/dashboard/hod#leaves",
-          isRead: false,
-          readBy: [],
-          metadata: { leaveId: leave._id, applicantId: resolvedApplicantId },
-        });
+      const formattedDates = `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`;
+      const leaveAlertMsg = `New leave request from ${resolvedApplicantName} for ${formattedDates}.`;
 
-        await Notification.create({
-          targetRole: "Principal",
-          excludeUserId: resolvedApplicantId,
-          title: `Faculty Leave Request (${resolvedDepartment})`,
-          message: `Prof. ${resolvedApplicantName} has applied for ${leaveType} leave.`,
-          type: "info",
-          link: "/dashboard/principal#leaves",
-          isRead: false,
-          readBy: [],
-          metadata: { leaveId: leave._id, applicantId: resolvedApplicantId },
-        });
-      } else {
-        // Student leave request: Notify HOD
-        await Notification.create({
-          targetRole: "HOD",
-          targetDepartment: resolvedDepartment,
-          excludeUserId: resolvedApplicantId,
-          title: "Student Leave Application",
-          message: `${resolvedApplicantName} requested ${leaveType} sanction. Review required.`,
-          type: "info",
-          link: "/dashboard/hod#leaves",
-          isRead: false,
-          readBy: [],
-          metadata: { leaveId: leave._id, applicantId: resolvedApplicantId },
-        });
-      }
+      // 1. Notify Department HOD
+      await Notification.create({
+        targetRole: "HOD",
+        targetDepartment: resolvedDepartment,
+        excludeUserId: resolvedApplicantId,
+        title: "New Leave Request",
+        message: leaveAlertMsg,
+        type: "info",
+        link: "/dashboard/hod#leaves",
+        isRead: false,
+        readBy: [],
+        metadata: {
+          leaveId: leave._id,
+          applicantId: resolvedApplicantId,
+          applicantName: resolvedApplicantName,
+          leaveType,
+          startDate,
+          endDate,
+        },
+      });
+
+      // 2. Also notify Principal (Executive oversight)
+      await Notification.create({
+        targetRole: "Principal",
+        excludeUserId: resolvedApplicantId,
+        title: "New Leave Request",
+        message: leaveAlertMsg,
+        type: "info",
+        link: "/dashboard/principal#leaves",
+        isRead: false,
+        readBy: [],
+        metadata: {
+          leaveId: leave._id,
+          applicantId: resolvedApplicantId,
+          applicantName: resolvedApplicantName,
+          leaveType,
+          department: resolvedDepartment,
+          startDate,
+          endDate,
+        },
+      });
     } catch (notifErr) {
       console.warn("Error creating leave notification:", notifErr);
     }
@@ -197,26 +202,48 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Leave document not found." }, { status: 404 });
     }
 
-    // Step 2 Requirement: Generate a brand new notification document targeting exclusively the applicant userId
+    // Step 2 Requirement: Insert notification targeting original applicant
+    const formattedDates = `${new Date(updated.startDate).toLocaleDateString()} to ${new Date(updated.endDate).toLocaleDateString()}`;
+    const resolutionMessage = `Your leave request for ${formattedDates} has been ${status}.`;
+
     try {
       await Notification.create({
         recipientId: updated.applicantId,
         title: `Leave Request ${status}`,
-        message: `Your leave request has been ${status} by the HOD`,
+        message: resolutionMessage,
         type: status === "Approved" ? "success" : "alert",
-        link: updated.applicantRole === "Teacher" ? "/dashboard/teacher" : "/dashboard/student",
+        link: updated.applicantRole === "Teacher" ? "/dashboard/teacher#leaves" : "/dashboard/student#leaves",
         isRead: false,
         readBy: [],
-        metadata: { leaveId: updated._id, status, decisionNotes: updated.decisionNotes },
+        metadata: {
+          leaveId: updated._id,
+          status,
+          decisionNotes: updated.decisionNotes,
+          startDate: updated.startDate,
+          endDate: updated.endDate,
+        },
       });
     } catch (notifErr) {
       console.warn("Error creating leave resolution notification:", notifErr);
     }
 
-    // Automated notification back to applicant
+    // Automated notification back to applicant (Native Push & Email)
     let notificationDispatched = false;
     try {
       const applicant = await User.findById(updated.applicantId);
+
+      // Send Native Web Push to applicant's devices
+      if (applicant?.pushSubscriptions && applicant.pushSubscriptions.length > 0) {
+        for (const sub of applicant.pushSubscriptions) {
+          await sendWebPush(sub, {
+            title: `Leave Request ${status}`,
+            body: resolutionMessage,
+            url: updated.applicantRole === "Teacher" ? "/dashboard/teacher#leaves" : "/dashboard/student#leaves",
+            tag: `leave-${updated._id}`,
+          });
+        }
+      }
+
       if (applicant?.email) {
         const smtpHost = process.env.SMTP_HOST || "smtp.gmail.com";
         const smtpPort = Number(process.env.SMTP_PORT) || 587;

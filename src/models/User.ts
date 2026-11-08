@@ -9,6 +9,15 @@ export type UserRole =
   | "Faculty / Teacher"
   | "Head of Dept (HOD)";
 
+export interface IPushSubscription {
+  endpoint: string;
+  keys: {
+    p256dh: string;
+    auth: string;
+  };
+  subscribedAt?: Date;
+}
+
 export interface IUser extends Document {
   clerkId: string;
   name: string;
@@ -26,6 +35,7 @@ export interface IUser extends Document {
   idCardSoftCopy?: string;
   sessionYear?: string;
   batchDuration?: string;
+  pushSubscriptions?: IPushSubscription[];
   archivedSessions?: Array<{
     semester: number;
     sessionYear: string;
@@ -127,6 +137,16 @@ const UserSchema = new Schema<IUser>(
       trim: true,
       default: "2024-2028",
     },
+    pushSubscriptions: [
+      {
+        endpoint: { type: String, required: true },
+        keys: {
+          p256dh: { type: String, required: true },
+          auth: { type: String, required: true },
+        },
+        subscribedAt: { type: Date, default: Date.now },
+      },
+    ],
     archivedSessions: [
       {
         semester: Number,

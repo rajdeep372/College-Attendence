@@ -33,6 +33,24 @@ export async function GET(req: NextRequest) {
 
     const notifications: RealNotificationItem[] = [];
 
+    // Normalize roles for broad compatibility (HOD vs Head of Dept (HOD), Principal vs Principal (Admin), etc.)
+    const userRole = (dbUser.role || "").trim();
+    const targetRoles: string[] = ["All", userRole];
+    if (userRole.includes("HOD")) {
+      targetRoles.push("HOD", "Head of Dept (HOD)");
+    }
+    if (userRole.includes("Principal")) {
+      targetRoles.push("Principal", "Principal (Admin)");
+    }
+    if (userRole.includes("Teacher") || userRole.includes("Faculty")) {
+      targetRoles.push("Teacher", "Faculty / Teacher");
+    }
+    if (userRole.includes("Student")) {
+      targetRoles.push("Student");
+    }
+
+    const isPrincipal = userRole.includes("Principal");
+
     // 1. Fetch targeted and role-based notifications from MongoDB Notification model
     // Explicitly excluding notifications where excludeUserId matches dbUser._id
     const dbNotifications = await Notification.find({
@@ -42,13 +60,17 @@ export async function GET(req: NextRequest) {
             { recipientId: dbUser._id },
             {
               recipientId: null,
-              targetRole: { $in: [dbUser.role as any, "All"] },
-              $or: [
-                { targetDepartment: { $exists: false } },
-                { targetDepartment: null },
-                { targetDepartment: "" },
-                { targetDepartment: dbUser.department },
-              ],
+              targetRole: { $in: Array.from(new Set(targetRoles)) },
+              ...(isPrincipal
+                ? {}
+                : {
+                    $or: [
+                      { targetDepartment: { $exists: false } },
+                      { targetDepartment: null },
+                      { targetDepartment: "" },
+                      { targetDepartment: dbUser.department },
+                    ],
+                  }),
             },
           ],
         },
@@ -62,7 +84,7 @@ export async function GET(req: NextRequest) {
       ],
     })
       .sort({ createdAt: -1 })
-      .limit(20)
+      .limit(30)
       .lean();
 
     for (const notif of (dbNotifications as any[])) {

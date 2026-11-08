@@ -72,26 +72,40 @@ export function DashboardAppBar() {
   }, [pathname]);
 
   // Fetch real user notifications strictly from MongoDB
-  useEffect(() => {
-    async function fetchRealNotifications() {
-      try {
-        setIsLoadingNotifications(true);
-        const res = await fetch("/api/notifications");
-        const data = await res.json();
-        if (data.success && Array.isArray(data.notifications)) {
-          setNotifications(data.notifications);
-        } else {
-          setNotifications([]);
-        }
-      } catch (err) {
-        console.warn("Failed to fetch real notifications:", err);
+  const fetchRealNotifications = async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      const data = await res.json();
+      if (data.success && Array.isArray(data.notifications)) {
+        setNotifications(data.notifications);
+      } else {
         setNotifications([]);
-      } finally {
-        setIsLoadingNotifications(false);
       }
+    } catch (err) {
+      console.warn("Failed to fetch real notifications:", err);
+      setNotifications([]);
+    } finally {
+      setIsLoadingNotifications(false);
     }
+  };
+
+  useEffect(() => {
     fetchRealNotifications();
+
+    // Periodic dynamic polling every 25 seconds so leave & class alerts update automatically
+    const interval = setInterval(() => {
+      fetchRealNotifications();
+    }, 25000);
+
+    return () => clearInterval(interval);
   }, [pathname]);
+
+  // When notifications menu is opened, immediately refresh latest notifications
+  useEffect(() => {
+    if (isNotificationsOpen) {
+      fetchRealNotifications();
+    }
+  }, [isNotificationsOpen]);
 
   // Fetch real department audit aggregation when opened
   useEffect(() => {
@@ -137,18 +151,23 @@ export function DashboardAppBar() {
     }
   };
 
-  const handleNotificationClick = async (id: string) => {
+  const handleNotificationClick = async (notif: NotificationItem) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
     );
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id: notif.id }),
       });
     } catch (err) {
       console.warn("Failed to persist notification read state in MongoDB:", err);
+    }
+
+    if (notif.link) {
+      setIsNotificationsOpen(false);
+      window.location.href = notif.link;
     }
   };
 
@@ -321,7 +340,7 @@ export function DashboardAppBar() {
                             return (
                               <div
                                 key={notif.id}
-                                onClick={() => handleNotificationClick(notif.id)}
+                                onClick={() => handleNotificationClick(notif)}
                                 className={`p-3.5 transition-colors cursor-pointer pointer-events-auto flex items-start gap-3 hover:bg-slate-800/60 ${
                                   !notif.read ? "bg-sky-500/5" : ""
                                 }`}

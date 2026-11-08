@@ -1,4 +1,4 @@
-const CACHE_NAME = 'academiasync-v2';
+const CACHE_NAME = 'academiasync-v3';
 const STATIC_ASSETS = [
   '/',
   '/offline.html',
@@ -78,6 +78,70 @@ self.addEventListener('fetch', (event) => {
             });
           }
         });
+    })
+  );
+});
+
+// ============================================================================
+// NATIVE MOBILE & DESKTOP BACKGROUND PUSH NOTIFICATIONS
+// ============================================================================
+
+self.addEventListener('push', (event) => {
+  let payload = {
+    title: 'Upcoming Class Alert!',
+    body: 'Your scheduled academic class starts in 10 minutes.',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    data: { url: '/dashboard' },
+    tag: 'class-alert'
+  };
+
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      payload = { ...payload, ...parsed };
+    } catch (e) {
+      payload.body = event.data.text() || payload.body;
+    }
+  }
+
+  const title = payload.title || 'AcademiaSync Alert';
+  const options = {
+    body: payload.body,
+    icon: payload.icon || '/icons/icon-192x192.png',
+    badge: payload.badge || '/icons/icon-192x192.png',
+    vibrate: [250, 100, 250, 100, 250],
+    tag: payload.tag || 'academiasync-class-alert',
+    renotify: true,
+    data: payload.data || { url: '/dashboard' },
+    actions: [
+      { action: 'open', title: 'Open Dashboard' }
+    ]
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/dashboard';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Check if a window matching the origin is already open
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          if (client.url.includes(targetUrl) || client.url.includes('/dashboard')) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
+        }
+      }
+      // If not open, open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });

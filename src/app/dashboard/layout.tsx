@@ -2,6 +2,7 @@
 
 import React from "react";
 import { DashboardAppBar } from "@/components/navigation/DashboardAppBar";
+import { PushNotificationManager } from "@/components/pwa/PushNotificationManager";
 
 export default function DashboardLayout({
   children,
@@ -10,6 +11,9 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="min-h-screen flex flex-col bg-slate-950/80 w-full max-w-full overflow-x-hidden">
+      {/* Background Push Notification permission prompt & subscription sync */}
+      <PushNotificationManager />
+
       {/* Interactive Institutional App Bar with Notifications & Department Audits */}
       <DashboardAppBar />
 

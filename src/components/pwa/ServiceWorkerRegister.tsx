@@ -4,20 +4,26 @@ import { useEffect } from "react";
 
 export default function ServiceWorkerRegister() {
   useEffect(() => {
-    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((registration) => {
-            console.log("[PWA] Service Worker registered with scope:", registration.scope);
-          })
-          .catch((error) => {
-            console.error("[PWA] Service Worker registration failed:", error);
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      const registerSW = async () => {
+        try {
+          const registration = await navigator.serviceWorker.register("/sw.js", {
+            scope: "/",
           });
-      });
+          console.log("[PWA] Service Worker registered with scope:", registration.scope);
+        } catch (error) {
+          console.error("[PWA] Service Worker registration failed:", error);
+        }
+      };
+
+      if (document.readyState === "complete") {
+        registerSW();
+      } else {
+        window.addEventListener("load", registerSW);
+        return () => window.removeEventListener("load", registerSW);
+      }
     }
   }, []);
 
   return null;
 }
-
