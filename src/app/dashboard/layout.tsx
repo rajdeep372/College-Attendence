@@ -9,7 +9,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50/90 dark:bg-slate-950/80 w-full max-w-full overflow-x-hidden transition-colors duration-200">
+    <div className="min-h-screen flex flex-col bg-slate-950/80 w-full max-w-full overflow-x-hidden">
       {/* Interactive Institutional App Bar with Notifications & Department Audits */}
       <DashboardAppBar />
 

@@ -102,18 +102,18 @@ export function ApplyLeaveModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="relative z-50 w-full max-w-lg bg-white border border-slate-200 dark:bg-slate-900 dark:border-sky-500/30 rounded-3xl p-6 shadow-2xl text-slate-900 dark:text-white overflow-hidden pointer-events-auto my-auto"
+            className="relative z-50 w-full max-w-lg bg-slate-900 border border-sky-500/30 rounded-3xl p-6 shadow-[0_0_50px_rgba(56,189,248,0.2)] text-white overflow-hidden pointer-events-auto my-auto"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10 mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-                <h2 className="text-lg font-bold text-slate-900 dark:text-white">Apply for Institutional Leave</h2>
+                <FileText className="w-5 h-5 text-sky-400" />
+                <h2 className="text-lg font-bold text-white">Apply for Institutional Leave</h2>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-900/40 dark:text-slate-400 dark:hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -121,14 +121,14 @@ export function ApplyLeaveModal({
             </div>
 
             {errorMessage && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{successMessage}</span>
               </div>
@@ -137,7 +137,7 @@ export function ApplyLeaveModal({
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               {/* Leave Type Select */}
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1.5">
+                <label className="block text-slate-300 font-semibold mb-1.5">
                   Leave Classification
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -146,10 +146,10 @@ export function ApplyLeaveModal({
                       key={type}
                       type="button"
                       onClick={() => setLeaveType(type)}
-                      className={`p-2.5 rounded-xl border font-medium text-left transition-all cursor-pointer pointer-events-auto shadow-sm ${
+                      className={`p-2.5 rounded-xl border font-medium text-left transition-all cursor-pointer pointer-events-auto ${
                         leaveType === type
-                          ? "bg-sky-100 border-sky-400 text-sky-800 dark:bg-sky-500/20 dark:border-sky-400 dark:text-sky-200"
-                          : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-800/60 dark:border-white/10 dark:text-slate-300 dark:hover:bg-slate-800"
+                          ? "bg-sky-500/20 border-sky-400 text-sky-200 shadow-[0_0_15px_rgba(56,189,248,0.2)]"
+                          : "bg-slate-800/60 border-white/10 text-slate-300 hover:bg-slate-800"
                       }`}
                     >
                       {type}
@@ -161,7 +161,7 @@ export function ApplyLeaveModal({
               {/* Date pickers */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  <label className="block text-slate-300 font-semibold mb-1">
                     Start Date
                   </label>
                   <div className="relative">
@@ -170,13 +170,13 @@ export function ApplyLeaveModal({
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
                       required
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-sky-500 dark:bg-slate-950 dark:border-white/10 dark:text-white text-xs cursor-pointer shadow-sm"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs cursor-pointer"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                  <label className="block text-slate-300 font-semibold mb-1">
                     End Date
                   </label>
                   <div className="relative">
@@ -185,7 +185,7 @@ export function ApplyLeaveModal({
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
                       required
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-sky-500 dark:bg-slate-950 dark:border-white/10 dark:text-white text-xs cursor-pointer shadow-sm"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs cursor-pointer"
                     />
                   </div>
                 </div>
@@ -193,7 +193,7 @@ export function ApplyLeaveModal({
 
               {/* Justification Reason */}
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-300 font-semibold mb-1">
                   Academic Justification & Reason
                 </label>
                 <textarea
@@ -202,13 +202,13 @@ export function ApplyLeaveModal({
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="Provide detailed justification for HOD review..."
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-sky-500 dark:bg-slate-950 dark:border-white/10 dark:text-white text-xs resize-none shadow-sm"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs resize-none"
                 />
               </div>
 
               {/* Security notice */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 dark:bg-slate-950 dark:border-white/5 dark:text-slate-400 flex items-start gap-2">
-                <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl bg-slate-950 border border-white/5 text-[11px] text-slate-400 flex items-start gap-2">
+                <Sparkles className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
                 <span>
                   Applications are routed directly to your Department Head ({department}). Official email notice will be dispatched once actioned.
                 </span>
@@ -219,7 +219,7 @@ export function ApplyLeaveModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-all cursor-pointer pointer-events-auto"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer pointer-events-auto"
                 >
                   Cancel
                 </button>

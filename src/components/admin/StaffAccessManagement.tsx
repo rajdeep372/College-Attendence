@@ -171,71 +171,71 @@ export function StaffAccessManagement() {
   }, [staffList]);
 
   return (
-    <div className="w-full rounded-3xl glass-card border border-sky-300/80 dark:border-sky-500/30 p-6 sm:p-8 space-y-6 text-slate-900 dark:text-white shadow-xl dark:shadow-2xl relative overflow-hidden animate-fade-in">
+    <div className="w-full rounded-3xl glass-card border border-sky-500/30 p-6 sm:p-8 space-y-6 text-white shadow-2xl relative overflow-hidden animate-fade-in">
       {/* Background Glow */}
       <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-sky-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-24 -left-24 w-80 h-80 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 dark:border-white/10 pb-6 relative z-10">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-6 relative z-10">
         <div>
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-50 text-sky-800 border border-sky-300 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-400/30 mb-2 shadow-sm">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-300 border border-sky-400/30 mb-2 shadow">
             <Lock className="w-3.5 h-3.5" />
             <span>Zero-Trust Institutional Whitelist</span>
           </div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight flex items-center gap-2.5">
-            <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+          <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
+            <ShieldCheck className="w-6 h-6 text-emerald-400" />
             <span>Staff Access Management</span>
           </h2>
-          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mt-1 max-w-xl">
+          <p className="text-xs sm:text-sm text-slate-300 mt-1 max-w-xl">
             Authorize faculty and department heads into the official MongoDB whitelist. The onboarding gate strictly queries this collection to lock role permissions.
           </p>
         </div>
 
         {/* Stats Chips */}
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="px-3.5 py-2 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-slate-900/80 dark:border-white/10 text-center">
-            <span className="block text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">Total Whitelisted</span>
-            <span className="text-base font-extrabold text-slate-900 dark:text-white font-mono">{staffList.length}</span>
+          <div className="px-3.5 py-2 rounded-2xl bg-slate-900/80 border border-white/10 text-center">
+            <span className="block text-[10px] text-slate-400 uppercase tracking-wider font-bold">Total Whitelisted</span>
+            <span className="text-base font-extrabold text-white font-mono">{staffList.length}</span>
           </div>
-          <div className="px-3.5 py-2 rounded-2xl bg-purple-50 border border-purple-200 dark:bg-purple-950/40 dark:border-purple-500/30 text-center">
-            <span className="block text-[10px] text-purple-700 dark:text-purple-300 uppercase tracking-wider font-bold">Authorized HODs</span>
-            <span className="text-base font-extrabold text-purple-700 dark:text-purple-300 font-mono">{hodCount}</span>
+          <div className="px-3.5 py-2 rounded-2xl bg-purple-950/40 border border-purple-500/30 text-center">
+            <span className="block text-[10px] text-purple-300 uppercase tracking-wider font-bold">Authorized HODs</span>
+            <span className="text-base font-extrabold text-purple-300 font-mono">{hodCount}</span>
           </div>
-          <div className="px-3.5 py-2 rounded-2xl bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/40 dark:border-emerald-500/30 text-center">
-            <span className="block text-[10px] text-emerald-700 dark:text-emerald-300 uppercase tracking-wider font-bold">Faculty / Teachers</span>
-            <span className="text-base font-extrabold text-emerald-700 dark:text-emerald-300 font-mono">{facultyCount}</span>
+          <div className="px-3.5 py-2 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-center">
+            <span className="block text-[10px] text-emerald-300 uppercase tracking-wider font-bold">Faculty / Teachers</span>
+            <span className="text-base font-extrabold text-emerald-300 font-mono">{facultyCount}</span>
           </div>
         </div>
       </div>
 
       {/* Alerts */}
       {errorMessage && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-500/15 dark:border-rose-500/40 dark:text-rose-200 text-xs sm:text-sm flex items-center gap-2.5 animate-fade-in">
-          <AlertCircle className="w-5 h-5 text-rose-500 dark:text-rose-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-200 text-xs sm:text-sm flex items-center gap-2.5 animate-fade-in">
+          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0" />
           <span>{errorMessage}</span>
         </div>
       )}
 
       {successMessage && (
-        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-500/15 dark:border-emerald-500/40 dark:text-emerald-200 text-xs sm:text-sm flex items-center gap-2.5 animate-fade-in">
-          <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm flex items-center gap-2.5 animate-fade-in">
+          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
           <span>{successMessage}</span>
         </div>
       )}
 
       {/* Authorize Staff Form */}
-      <form onSubmit={handleAddStaff} className="p-5 sm:p-6 rounded-2xl bg-slate-50 border border-slate-200 dark:bg-slate-950/70 dark:border-sky-500/20 space-y-4 relative z-10 shadow-sm">
-        <div className="flex items-center gap-2 text-xs font-bold text-sky-700 dark:text-sky-300 uppercase tracking-wider">
-          <UserPlus className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+      <form onSubmit={handleAddStaff} className="p-5 sm:p-6 rounded-2xl bg-slate-950/70 border border-sky-500/20 space-y-4 relative z-10 shadow-inner">
+        <div className="flex items-center gap-2 text-xs font-bold text-sky-300 uppercase tracking-wider">
+          <UserPlus className="w-4 h-4 text-sky-400" />
           <span>Authorize New Staff Member</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs sm:text-sm">
           {/* Authorized Email */}
           <div className="lg:col-span-1">
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
-              <Mail className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+              <Mail className="w-3.5 h-3.5 text-sky-400" />
               <span>Authorized Email *</span>
             </label>
             <input
@@ -244,25 +244,25 @@ export function StaffAccessManagement() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="e.g. aditya@college.edu"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 dark:bg-slate-900 dark:border-white/10 dark:text-white dark:placeholder-slate-500 text-xs font-mono shadow-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-xs font-mono"
             />
           </div>
 
           {/* Role Dropdown strictly for Faculty / Teacher and Head of Dept (HOD) */}
           <div className="lg:col-span-1">
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
-              <Briefcase className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+            <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+              <Briefcase className="w-3.5 h-3.5 text-purple-400" />
               <span>Institutional Role *</span>
             </label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as "Faculty / Teacher" | "Head of Dept (HOD)")}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-amber-800 dark:text-amber-300 font-bold focus:outline-none focus:border-purple-500 dark:bg-slate-900 dark:border-white/10 text-xs cursor-pointer shadow-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-amber-300 font-bold focus:outline-none focus:border-purple-400 text-xs cursor-pointer"
             >
-              <option value="Faculty / Teacher" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+              <option value="Faculty / Teacher" className="bg-slate-900 text-white">
                 Faculty / Teacher
               </option>
-              <option value="Head of Dept (HOD)" className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+              <option value="Head of Dept (HOD)" className="bg-slate-900 text-white">
                 Head of Dept (HOD)
               </option>
             </select>
@@ -270,8 +270,8 @@ export function StaffAccessManagement() {
 
           {/* Full Official Name */}
           <div className="lg:col-span-1">
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
-              <GraduationCap className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-sky-400" />
               <span>Full Official Name *</span>
             </label>
             <input
@@ -280,23 +280,23 @@ export function StaffAccessManagement() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Dr. Aditya Sen"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 dark:bg-slate-900 dark:border-white/10 dark:text-white dark:placeholder-slate-500 text-xs shadow-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-xs"
             />
           </div>
 
           {/* Department */}
           <div className="lg:col-span-1">
-            <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+            <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5 text-sky-400" />
               <span>Academic Department *</span>
             </label>
             <select
               value={department}
               onChange={(e) => setDepartment(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-sky-500 dark:bg-slate-900 dark:border-white/10 dark:text-white text-xs cursor-pointer shadow-sm"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs cursor-pointer"
             >
               {DEPARTMENTS.map((dept) => (
-                <option key={dept} value={dept} className="bg-white text-slate-900 dark:bg-slate-900 dark:text-white">
+                <option key={dept} value={dept} className="bg-slate-900">
                   {dept}
                 </option>
               ))}
@@ -329,11 +329,11 @@ export function StaffAccessManagement() {
       <div className="space-y-4 relative z-10">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <h3 className="text-sm sm:text-base font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+            <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+              <Layers className="w-4 h-4 text-sky-400" />
               <span>Current Authorized Whitelist</span>
             </h3>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-500/20 dark:text-sky-300 font-mono">
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/20 text-sky-300 font-mono">
               {filteredStaff.length} Records
             </span>
           </div>
@@ -347,7 +347,7 @@ export function StaffAccessManagement() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search email, role, dept..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-white border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-sky-500 dark:bg-slate-900/90 dark:border-white/10 dark:text-white dark:placeholder-slate-500 shadow-sm"
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-900/90 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400"
               />
             </div>
 
@@ -356,18 +356,18 @@ export function StaffAccessManagement() {
               onClick={fetchStaffList}
               disabled={isLoading}
               title="Refresh Staff List"
-              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900 dark:bg-slate-900 dark:hover:bg-slate-800 dark:border-white/10 dark:text-slate-300 dark:hover:text-white transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-white/10 text-slate-300 hover:text-white transition-all cursor-pointer"
             >
-              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-sky-600 dark:text-sky-400" : ""}`} />
+              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin text-sky-400" : ""}`} />
             </button>
           </div>
         </div>
 
         {/* Table Content */}
-        <div className="rounded-2xl border border-slate-200 dark:border-white/10 overflow-hidden bg-white dark:bg-slate-950/80 shadow-sm">
+        <div className="rounded-2xl border border-white/10 overflow-hidden bg-slate-950/80 shadow-inner">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-              <thead className="bg-slate-50 text-slate-500 dark:bg-slate-900/90 dark:text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-200 dark:border-white/10 font-mono">
+            <table className="w-full text-left text-xs text-slate-300">
+              <thead className="bg-slate-900/90 text-slate-400 uppercase text-[10px] tracking-wider border-b border-white/10 font-mono">
                 <tr>
                   <th className="p-3.5">Authorized Email</th>
                   <th className="p-3.5">Assigned Role</th>
@@ -377,18 +377,18 @@ export function StaffAccessManagement() {
                   <th className="p-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+              <tbody className="divide-y divide-white/5">
                 {isLoading ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
-                      <Loader2 className="w-6 h-6 animate-spin text-sky-600 dark:text-sky-400 mx-auto mb-2" />
+                    <td colSpan={6} className="p-8 text-center text-slate-400">
+                      <Loader2 className="w-6 h-6 animate-spin text-sky-400 mx-auto mb-2" />
                       <span>Querying authorizedstaffs MongoDB collection...</span>
                     </td>
                   </tr>
                 ) : filteredStaff.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-slate-500 dark:text-slate-400">
-                      <ShieldCheck className="w-8 h-8 text-slate-400 dark:text-slate-600 mx-auto mb-2" />
+                    <td colSpan={6} className="p-8 text-center text-slate-400">
+                      <ShieldCheck className="w-8 h-8 text-slate-600 mx-auto mb-2" />
                       {searchQuery ? "No staff match your search criteria." : "No staff members currently in the whitelist."}
                     </td>
                   </tr>
@@ -398,10 +398,10 @@ export function StaffAccessManagement() {
                     const isRevoking = revokingEmail === staff.email;
 
                     return (
-                      <tr key={staff._id || staff.email} className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors">
+                      <tr key={staff._id || staff.email} className="hover:bg-white/[0.02] transition-colors">
                         <td className="p-3.5">
-                          <div className="font-mono text-slate-900 dark:text-white font-semibold flex items-center gap-1.5">
-                            <Mail className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400 shrink-0" />
+                          <div className="font-mono text-white font-semibold flex items-center gap-1.5">
+                            <Mail className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                             <span>{staff.email}</span>
                           </div>
                         </td>
@@ -409,32 +409,32 @@ export function StaffAccessManagement() {
                           <span
                             className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${
                               isHod
-                                ? "bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30"
-                                : "bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
+                                ? "bg-purple-500/20 text-purple-300 border-purple-500/30 shadow-[0_0_10px_rgba(168,85,247,0.2)]"
+                                : "bg-emerald-500/20 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
                             }`}
                           >
                             {staff.role}
                           </span>
                         </td>
-                        <td className="p-3.5 text-slate-600 dark:text-slate-300 max-w-[200px] truncate">
+                        <td className="p-3.5 text-slate-300 max-w-[200px] truncate">
                           {staff.department || "All Departments"}
                         </td>
-                        <td className="p-3.5 text-slate-900 dark:text-white font-medium">
-                          {staff.name || <span className="text-slate-400 dark:text-slate-500 italic">Self-Enrolling</span>}
+                        <td className="p-3.5 text-white font-medium">
+                          {staff.name || <span className="text-slate-500 italic">Self-Enrolling</span>}
                         </td>
-                        <td className="p-3.5 text-slate-500 dark:text-slate-400 text-[11px] font-mono">
+                        <td className="p-3.5 text-slate-400 text-[11px] font-mono">
                           {staff.createdAt ? new Date(staff.createdAt).toLocaleDateString() : "Active"}
                         </td>
                         <td className="p-3.5 text-right">
                           <button
                             onClick={() => handleRevokeStaff(staff.email)}
                             disabled={isRevoking}
-                            className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:hover:bg-rose-500/30 dark:text-rose-300 dark:border-rose-500/30 dark:hover:border-rose-400 text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 hover:border-rose-400 text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
                           >
                             {isRevoking ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             ) : (
-                              <Trash2 className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                             )}
                             <span>Revoke Access</span>
                           </button>

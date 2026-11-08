@@ -125,12 +125,12 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
           ${isCollapsed ? "lg:w-20" : "lg:w-72"}
           w-72 max-w-[85vw]
           ${isMobileOpen ? "translate-x-0 z-[60]" : "-translate-x-full lg:translate-x-0 z-40"}
-          bg-white/90 dark:bg-slate-950/90 backdrop-blur-2xl border-r border-slate-200/80 dark:border-sky-500/20 shadow-md dark:shadow-[10px_0_35px_rgba(0,0,0,0.5)] pointer-events-auto
+          bg-slate-950/90 backdrop-blur-2xl border-r border-sky-500/20 shadow-[10px_0_35px_rgba(0,0,0,0.5)] pointer-events-auto
         `}
       >
         {/* Top Header / Brand Logo */}
         <div>
-          <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between">
+          <div className="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between">
             <Link
               href={`/dashboard/${role.toLowerCase()}`}
               onClick={() => setIsMobileOpen(false)}
@@ -144,10 +144,10 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
 
               {!isCollapsed && (
                 <div className="animate-fade-in overflow-hidden whitespace-nowrap">
-                  <div className="font-extrabold text-base tracking-tight text-slate-900 dark:text-white flex items-center gap-1">
-                    Academia<span className="text-sky-500 dark:text-sky-400">Sync</span>
+                  <div className="font-extrabold text-base tracking-tight text-white flex items-center gap-1">
+                    Academia<span className="text-sky-400">Sync</span>
                   </div>
-                  <div className="text-[10px] font-mono tracking-widest text-sky-600 dark:text-sky-400/80 -mt-0.5 font-semibold">
+                  <div className="text-[10px] font-mono tracking-widest text-sky-400/80 -mt-0.5">
                     {role.toUpperCase()} PORTAL
                   </div>
                 </div>
@@ -158,7 +158,7 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
             <button
               type="button"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="hidden lg:flex p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 dark:bg-slate-900/80 dark:hover:bg-slate-800 dark:text-slate-400 dark:hover:text-white dark:border-white/10 transition-colors cursor-pointer pointer-events-auto"
+              className="hidden lg:flex p-1.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-white/10 transition-colors cursor-pointer pointer-events-auto"
               title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             >
               {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -168,7 +168,7 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
             <button
               type="button"
               onClick={() => setIsMobileOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-white cursor-pointer pointer-events-auto"
+              className="lg:hidden p-1.5 rounded-xl bg-slate-900 text-slate-400 hover:text-white cursor-pointer pointer-events-auto"
             >
               <X className="w-4 h-4" />
             </button>
@@ -176,17 +176,17 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
 
           {/* Role Status Tag */}
           {!isCollapsed && (
-            <div className="px-4 py-3 mx-3 mt-3 rounded-2xl bg-slate-50 dark:bg-gradient-to-r dark:from-sky-950/60 dark:to-slate-900/60 border border-slate-200/80 dark:border-sky-500/20 flex items-center justify-between">
+            <div className="px-4 py-3 mx-3 mt-3 rounded-2xl bg-gradient-to-r from-sky-950/60 to-slate-900/60 border border-sky-500/20 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                <span className="text-xs font-semibold text-slate-200">
                   {currentRole.badge}
                 </span>
               </div>
-              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 font-bold">
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20">
                 Active
               </span>
             </div>
@@ -205,15 +205,15 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
                   onClick={() => setIsMobileOpen(false)}
                   className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition-all duration-200 cursor-pointer pointer-events-auto ${
                     isActive
-                      ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-md dark:shadow-[0_0_20px_rgba(56,189,248,0.35)]"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100/90 border border-transparent hover:border-slate-200/80 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-900/70 dark:border-transparent dark:hover:border-white/5"
+                      ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_0_20px_rgba(56,189,248,0.35)]"
+                      : "text-slate-300 hover:text-white hover:bg-slate-900/70 border border-transparent hover:border-white/5"
                   }`}
                   title={isCollapsed ? item.title : undefined}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-sky-500 group-hover:text-sky-600 dark:text-sky-400 dark:group-hover:text-sky-300"}`} />
+                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? "text-white" : "text-sky-400 group-hover:text-sky-300"}`} />
 
                   {!isCollapsed && (
-                    <span className="truncate flex-1 font-semibold">{item.title}</span>
+                    <span className="truncate flex-1">{item.title}</span>
                   )}
 
                   {!isCollapsed && item.badge && (
@@ -221,7 +221,7 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
                       className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         isActive
                           ? "bg-white/20 text-white"
-                          : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30"
+                          : "bg-sky-500/15 text-sky-300 border border-sky-500/30"
                       }`}
                     >
                       {item.badge}
@@ -241,27 +241,27 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
         </div>
 
         {/* Bottom Panel: Live Geofence Sensor, User & Utilities */}
-        <div className="p-3 border-t border-slate-200/80 dark:border-white/10 space-y-3">
+        <div className="p-3 border-t border-white/10 space-y-3">
           {/* Mini Geofence Status */}
           {!isCollapsed && (
-            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-sky-500/20 text-xs">
-              <div className="flex items-center justify-between text-slate-700 dark:text-slate-300 mb-1">
-                <span className="flex items-center gap-1.5 text-sky-600 dark:text-sky-300 font-semibold">
+            <div className="p-3 rounded-2xl bg-slate-900/60 border border-sky-500/20 text-xs">
+              <div className="flex items-center justify-between text-slate-300 mb-1">
+                <span className="flex items-center gap-1.5 text-sky-300 font-semibold">
                   <MapPin className="w-3.5 h-3.5" /> Campus Radius
                 </span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-bold">&le; 50m</span>
+                <span className="text-emerald-400 font-bold">&le; 50m</span>
               </div>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+              <p className="text-[10px] text-slate-400">
                 PWA GPS Attendance Sync Active
               </p>
             </div>
           )}
 
           {/* User profile & actions with Instant Skeleton Loading */}
-          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-white/5">
+          <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-slate-900/40 border border-white/5">
             <div className="flex items-center gap-2 overflow-hidden">
               <ClerkLoading>
-                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 border border-sky-500/20 animate-pulse shrink-0" />
+                <div className="w-8 h-8 rounded-full bg-slate-800 border border-sky-500/20 animate-pulse shrink-0" />
               </ClerkLoading>
               <ClerkLoaded>
                 <UserButton />
@@ -269,10 +269,10 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
 
               {!isCollapsed && (
                 <div className="truncate text-left">
-                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  <div className="text-xs font-semibold text-slate-200 truncate">
                     {user?.fullName || `${currentRole.title}`}
                   </div>
-                  <div className="text-[10px] text-sky-600 dark:text-sky-400 truncate font-mono font-bold">
+                  <div className="text-[10px] text-sky-400 truncate font-mono">
                     {role.toUpperCase()}
                   </div>
                 </div>
@@ -287,8 +287,8 @@ export function DashboardSidebar({ role, customItems }: DashboardSidebarProps) {
           </div>
 
           {!isCollapsed && (
-            <div className="flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-white/5 select-none">
-              <Shield className="w-3 h-3 text-sky-500 dark:text-sky-400" />
+            <div className="flex items-center justify-center gap-1.5 w-full py-2 px-3 rounded-xl text-[11px] font-mono text-slate-400 bg-slate-900/60 border border-white/5 select-none">
+              <Shield className="w-3 h-3 text-sky-400" />
               <span>Strict Role-Enforced</span>
             </div>
           )}

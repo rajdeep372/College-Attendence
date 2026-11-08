@@ -80,7 +80,7 @@ export function ParentAdvisoryModal({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
-            className="fixed inset-0 bg-slate-900/60 dark:bg-slate-950/80 backdrop-blur-md cursor-pointer pointer-events-auto"
+            className="fixed inset-0 bg-slate-950/80 backdrop-blur-md cursor-pointer pointer-events-auto"
           />
 
           {/* Modal Container */}
@@ -89,23 +89,23 @@ export function ParentAdvisoryModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="relative z-50 w-full max-w-lg bg-white dark:bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-2xl dark:shadow-[0_0_50px_rgba(245,158,11,0.2)] text-slate-900 dark:text-white overflow-hidden pointer-events-auto my-auto"
+            className="relative z-50 w-full max-w-lg bg-slate-900 border border-amber-500/30 rounded-3xl p-6 shadow-[0_0_50px_rgba(245,158,11,0.2)] text-white overflow-hidden pointer-events-auto my-auto"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10 mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
               <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
                   <AlertTriangle className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Parent / Guardian Attendance Advisory</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{department}</p>
+                  <h2 className="text-lg font-bold text-white">Parent / Guardian Attendance Advisory</h2>
+                  <p className="text-xs text-slate-400">{department}</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-xl bg-slate-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-900/40 text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
+                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -113,14 +113,14 @@ export function ParentAdvisoryModal({
             </div>
 
             {error && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             {message && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{message}</span>
               </div>
@@ -129,18 +129,18 @@ export function ParentAdvisoryModal({
             <div className="space-y-4 text-xs">
               {/* Defaulter Count Highlight */}
               <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                <div className="flex items-center gap-2 text-amber-300">
                   <Users className="w-4 h-4 shrink-0" />
                   <span className="font-semibold">Target Cohort</span>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   {defaulters.length} Defaulters Identified (&lt;75%)
                 </span>
               </div>
 
               {/* Custom Directive Input */}
               <div>
-                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-300 font-semibold mb-1">
                   Official Advisory Message (Delivered via Nodemailer)
                 </label>
                 <textarea
@@ -148,7 +148,7 @@ export function ParentAdvisoryModal({
                   value={customNote}
                   onChange={(e) => setCustomNote(e.target.value)}
                   placeholder="Enter notice text dispatched to registered parents..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:border-amber-500 text-xs resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-amber-400 text-xs resize-none"
                 />
               </div>
 
@@ -157,7 +157,7 @@ export function ParentAdvisoryModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium transition-all cursor-pointer pointer-events-auto"
+                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer pointer-events-auto"
                 >
                   Cancel
                 </button>
@@ -165,7 +165,7 @@ export function ParentAdvisoryModal({
                   type="button"
                   onClick={handleDispatch}
                   disabled={isSending}
-                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-semibold shadow-lg shadow-amber-500/20 transition-all cursor-pointer pointer-events-auto flex items-center gap-2 disabled:opacity-50"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-semibold shadow-[0_0_20px_rgba(245,158,11,0.35)] transition-all cursor-pointer pointer-events-auto flex items-center gap-2 disabled:opacity-50"
                 >
                   {isSending ? (
                     <>
