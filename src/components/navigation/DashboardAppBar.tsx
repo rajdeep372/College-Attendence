@@ -34,7 +34,7 @@ export interface NotificationItem {
   title: string;
   message: string;
   time: string;
-  type: "alert" | "success" | "info" | "circular";
+  type: "alert" | "success" | "info" | "circular" | "LEAVE_APPLICATION" | string;
   read: boolean;
   link?: string;
 }
@@ -337,6 +337,7 @@ export function DashboardAppBar() {
                           notifications.map((notif) => {
                             const isAlert = notif.type === "alert";
                             const isSuccess = notif.type === "success";
+                            const isLeaveApp = notif.type === "LEAVE_APPLICATION";
                             return (
                               <div
                                 key={notif.id}
@@ -351,6 +352,8 @@ export function DashboardAppBar() {
                                       ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
                                       : isSuccess
                                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                      : isLeaveApp
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
                                       : "bg-sky-500/20 text-sky-400 border border-sky-500/30"
                                   }`}
                                 >
@@ -358,6 +361,8 @@ export function DashboardAppBar() {
                                     <AlertCircle className="w-4 h-4" />
                                   ) : isSuccess ? (
                                     <CheckCircle2 className="w-4 h-4" />
+                                  ) : isLeaveApp ? (
+                                    <FileText className="w-4 h-4 text-amber-400" />
                                   ) : (
                                     <FileText className="w-4 h-4" />
                                   )}
@@ -365,13 +370,20 @@ export function DashboardAppBar() {
 
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center justify-between gap-2 mb-1">
-                                    <p
-                                      className={`text-xs font-semibold truncate ${
-                                        !notif.read ? "text-white" : "text-slate-300"
-                                      }`}
-                                    >
-                                      {notif.title}
-                                    </p>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <p
+                                        className={`text-xs font-semibold truncate ${
+                                          !notif.read ? "text-white" : "text-slate-300"
+                                        }`}
+                                      >
+                                        {notif.title}
+                                      </p>
+                                      {isLeaveApp && (
+                                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
+                                          LEAVE
+                                        </span>
+                                      )}
+                                    </div>
                                     <span className="text-[10px] text-slate-500 shrink-0 font-mono">
                                       {notif.time}
                                     </span>

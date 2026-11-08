@@ -189,3 +189,4 @@ async function handleClassAlerts(req: NextRequest) {
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
+

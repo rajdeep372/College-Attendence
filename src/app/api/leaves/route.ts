@@ -69,42 +69,19 @@ export async function POST(req: NextRequest) {
       status: "Pending",
     });
 
-    // Step 2 Requirement: Automatically insert notifications targeted at relevant HOD & Principal
+    // Role-Based Notification Trigger (POST /api/leaves):
+    // Insert a single role-based notification document targeted at Principal & HOD
     try {
-      const formattedDates = `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`;
-      const leaveAlertMsg = `New leave request from ${resolvedApplicantName} for ${formattedDates}.`;
-
-      // 1. Notify Department HOD
       await Notification.create({
-        targetRole: "HOD",
+        type: "LEAVE_APPLICATION",
+        title: "New Leave Application",
+        message: `New leave request from ${resolvedApplicantName}`,
+        targetRoles: ["Principal (Admin)", "Head of Dept (HOD)", "Principal", "HOD"],
         targetDepartment: resolvedDepartment,
         excludeUserId: resolvedApplicantId,
-        title: "New Leave Request",
-        message: leaveAlertMsg,
-        type: "info",
+        isRead: false,
+        readBy: [],
         link: "/dashboard/hod#leaves",
-        isRead: false,
-        readBy: [],
-        metadata: {
-          leaveId: leave._id,
-          applicantId: resolvedApplicantId,
-          applicantName: resolvedApplicantName,
-          leaveType,
-          startDate,
-          endDate,
-        },
-      });
-
-      // 2. Also notify Principal (Executive oversight)
-      await Notification.create({
-        targetRole: "Principal",
-        excludeUserId: resolvedApplicantId,
-        title: "New Leave Request",
-        message: leaveAlertMsg,
-        type: "info",
-        link: "/dashboard/principal#leaves",
-        isRead: false,
-        readBy: [],
         metadata: {
           leaveId: leave._id,
           applicantId: resolvedApplicantId,

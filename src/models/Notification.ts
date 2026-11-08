@@ -1,13 +1,20 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
-export type NotificationType = "alert" | "success" | "info" | "circular";
+export type NotificationType =
+  | "alert"
+  | "success"
+  | "info"
+  | "circular"
+  | "LEAVE_APPLICATION"
+  | string;
 
 export interface INotification extends Document {
   recipientId?: Types.ObjectId | null;
   targetRole?: "Student" | "Teacher" | "HOD" | "Principal" | "Principal (Admin)" | "Faculty / Teacher" | "Head of Dept (HOD)" | "All" | string;
+  targetRoles?: string[];
   targetDepartment?: string;
   excludeUserId?: Types.ObjectId | null;
-  title: string;
+  title?: string;
   message: string;
   type: NotificationType;
   link?: string;
@@ -31,6 +38,11 @@ const NotificationSchema = new Schema<INotification>(
       default: undefined,
       index: true,
     },
+    targetRoles: {
+      type: [String],
+      default: undefined,
+      index: true,
+    },
     targetDepartment: {
       type: String,
       trim: true,
@@ -45,7 +57,7 @@ const NotificationSchema = new Schema<INotification>(
     },
     title: {
       type: String,
-      required: [true, "Notification title is required"],
+      default: "New Notification",
       trim: true,
     },
     message: {
@@ -55,7 +67,6 @@ const NotificationSchema = new Schema<INotification>(
     },
     type: {
       type: String,
-      enum: ["alert", "success", "info", "circular"],
       default: "info",
     },
     link: {
@@ -83,13 +94,13 @@ const NotificationSchema = new Schema<INotification>(
   }
 );
 
-// Indexes for fast querying per user and audience
+// Indexes for fast querying per user, audience, and role-based targets
 NotificationSchema.index({ recipientId: 1, isRead: 1, createdAt: -1 });
 NotificationSchema.index({ targetRole: 1, targetDepartment: 1, createdAt: -1 });
+NotificationSchema.index({ targetRoles: 1, targetDepartment: 1, createdAt: -1 });
 
 const Notification: Model<INotification> =
   (mongoose.models && mongoose.models.Notification) ||
   mongoose.model<INotification>("Notification", NotificationSchema);
 
 export default Notification;
-

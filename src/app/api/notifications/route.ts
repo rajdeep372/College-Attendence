@@ -12,7 +12,7 @@ export interface RealNotificationItem {
   title: string;
   message: string;
   time: string;
-  type: "alert" | "success" | "info" | "circular";
+  type: "alert" | "success" | "info" | "circular" | "LEAVE_APPLICATION" | string;
   read: boolean;
   link?: string;
 }
@@ -33,47 +33,91 @@ export async function GET(req: NextRequest) {
 
     const notifications: RealNotificationItem[] = [];
 
-    // Normalize roles for broad compatibility (HOD vs Head of Dept (HOD), Principal vs Principal (Admin), etc.)
+    // Normalize user role and determine authority scope
     const userRole = (dbUser.role || "").trim();
-    const targetRoles: string[] = ["All", userRole];
-    if (userRole.includes("HOD")) {
-      targetRoles.push("HOD", "Head of Dept (HOD)");
-    }
-    if (userRole.includes("Principal")) {
-      targetRoles.push("Principal", "Principal (Admin)");
-    }
-    if (userRole.includes("Teacher") || userRole.includes("Faculty")) {
-      targetRoles.push("Teacher", "Faculty / Teacher");
-    }
-    if (userRole.includes("Student")) {
-      targetRoles.push("Student");
-    }
-
     const isPrincipal = userRole.includes("Principal");
+    const isHOD = userRole.includes("HOD");
 
-    // 1. Fetch targeted and role-based notifications from MongoDB Notification model
-    // Explicitly excluding notifications where excludeUserId matches dbUser._id
-    const dbNotifications = await Notification.find({
+    const roleAliases = [userRole];
+    if (isPrincipal) {
+      roleAliases.push("Principal (Admin)", "Principal");
+    } else if (isHOD) {
+      roleAliases.push("Head of Dept (HOD)", "HOD");
+    } else if (userRole.includes("Teacher") || userRole.includes("Faculty")) {
+      roleAliases.push("Faculty / Teacher", "Teacher");
+    } else if (userRole.includes("Student")) {
+      roleAliases.push("Student");
+    }
+    const uniqueRoleAliases = Array.from(new Set(roleAliases));
+
+    // Admin Bell Icon Query:
+    // Looks for recipientId === currentUser.id
+    // ALSO includes $or condition for role-based alerts: $or: [{ targetRoles: currentUser.role }]
+    // (If the user is an HOD, ensure it also matches targetDepartment === currentUser.department)
+    const roleBasedOrConditions: any[] = [
+      // 1. Direct recipient alert
+      { recipientId: dbUser._id },
+    ];
+
+    if (isPrincipal) {
+      // Principal has institution-wide oversight across all departments
+      roleBasedOrConditions.push(
+        { targetRoles: dbUser.role },
+        { targetRoles: { $in: uniqueRoleAliases } },
+        { targetRole: { $in: uniqueRoleAliases } },
+        { targetRole: "All" }
+      );
+    } else if (isHOD) {
+      // HOD matches targetRoles AND targetDepartment matches HOD's department
+      const departmentFilter = {
+        $or: [
+          { targetDepartment: dbUser.department },
+          { targetDepartment: { $exists: false } },
+          { targetDepartment: null },
+          { targetDepartment: "" },
+        ],
+      };
+
+      roleBasedOrConditions.push({
+        $and: [
+          {
+            $or: [
+              { targetRoles: dbUser.role },
+              { targetRoles: { $in: uniqueRoleAliases } },
+              { targetRole: { $in: uniqueRoleAliases } },
+              { targetRole: "All" },
+            ],
+          },
+          departmentFilter,
+        ],
+      });
+    } else {
+      // Teachers and Students
+      roleBasedOrConditions.push({
+        $and: [
+          {
+            $or: [
+              { targetRoles: dbUser.role },
+              { targetRoles: { $in: uniqueRoleAliases } },
+              { targetRole: { $in: uniqueRoleAliases } },
+              { targetRole: "All" },
+            ],
+          },
+          {
+            $or: [
+              { targetDepartment: { $exists: false } },
+              { targetDepartment: null },
+              { targetDepartment: "" },
+              { targetDepartment: dbUser.department },
+            ],
+          },
+        ],
+      });
+    }
+
+    const query = {
       $and: [
-        {
-          $or: [
-            { recipientId: dbUser._id },
-            {
-              recipientId: null,
-              targetRole: { $in: Array.from(new Set(targetRoles)) },
-              ...(isPrincipal
-                ? {}
-                : {
-                    $or: [
-                      { targetDepartment: { $exists: false } },
-                      { targetDepartment: null },
-                      { targetDepartment: "" },
-                      { targetDepartment: dbUser.department },
-                    ],
-                  }),
-            },
-          ],
-        },
+        { $or: roleBasedOrConditions },
         {
           $or: [
             { excludeUserId: { $exists: false } },
@@ -82,25 +126,29 @@ export async function GET(req: NextRequest) {
           ],
         },
       ],
-    })
+    };
+
+    const dbNotifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .limit(30)
       .lean();
 
     for (const notif of (dbNotifications as any[])) {
-      const isRead = Boolean(
-        notif.isRead ||
-        (notif.readBy && notif.readBy.some((id: any) => id.toString() === dbUser._id.toString()))
+      // For role-based broadcast alerts (e.g. LEAVE_APPLICATION), track per-user read status using readBy
+      const isRoleBroadcast = Boolean(notif.targetRoles?.length || (!notif.recipientId && notif.targetRole));
+      const hasUserRead = Boolean(
+        notif.readBy && notif.readBy.some((id: any) => id.toString() === dbUser._id.toString())
       );
+      const isRead = isRoleBroadcast ? hasUserRead : Boolean(notif.isRead || hasUserRead);
 
       notifications.push({
         id: notif._id.toString(),
-        title: notif.title,
+        title: notif.title || (notif.type === "LEAVE_APPLICATION" ? "New Leave Request" : "Notification"),
         message: notif.message,
         time: formatRelativeTime(notif.createdAt),
         type: notif.type || "info",
         read: isRead,
-        link: notif.link || (dbUser.role === "Student" ? "/dashboard/student" : "/dashboard/teacher"),
+        link: notif.link || (isHOD ? "/dashboard/hod#leaves" : isPrincipal ? "/dashboard/principal#leaves" : "/dashboard"),
       });
     }
 
@@ -181,6 +229,17 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const { id, all = false } = body;
 
+    const userRole = (dbUser.role || "").trim();
+    const roleAliases = [userRole];
+    if (userRole.includes("Principal")) {
+      roleAliases.push("Principal (Admin)", "Principal");
+    } else if (userRole.includes("HOD")) {
+      roleAliases.push("Head of Dept (HOD)", "HOD");
+    } else if (userRole.includes("Teacher") || userRole.includes("Faculty")) {
+      roleAliases.push("Faculty / Teacher", "Teacher");
+    }
+    const uniqueRoleAliases = Array.from(new Set(roleAliases));
+
     if (all) {
       // Mark all notifications as read for this user in MongoDB
       await Promise.all([
@@ -189,11 +248,14 @@ export async function PATCH(req: NextRequest) {
           { recipientId: dbUser._id },
           { $set: { isRead: true }, $addToSet: { readBy: dbUser._id } }
         ),
-        // Role/Audience notifications
+        // Role-based / Audience notifications
         Notification.updateMany(
           {
-            recipientId: null,
-            targetRole: { $in: [dbUser.role as any, "All"] } as any,
+            $or: [
+              { targetRoles: dbUser.role },
+              { targetRoles: { $in: uniqueRoleAliases } },
+              { targetRole: { $in: [...uniqueRoleAliases, "All"] } },
+            ],
           },
           { $addToSet: { readBy: dbUser._id } }
         ),
