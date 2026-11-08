@@ -3,8 +3,8 @@ import mongoose, { Schema, Document, Model } from "mongoose";
 export interface IAuthorizedStaff extends Document {
   email: string;
   role: string;
-  name?: string;
-  department?: string;
+  name: string;
+  department: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,13 +26,13 @@ const AuthorizedStaffSchema = new Schema<IAuthorizedStaff>(
     },
     name: {
       type: String,
+      required: [true, "Full official name is required"],
       trim: true,
-      default: "",
     },
     department: {
       type: String,
+      required: [true, "Academic department is required"],
       trim: true,
-      default: "",
     },
   },
   {

@@ -19,7 +19,8 @@ import {
   UserCheck,
   Calendar,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Lock
 } from "lucide-react";
 import { UserRole } from "@/models/User";
 import { 
@@ -82,6 +83,7 @@ interface OnboardingFormProps {
   initialDisplayRole?: string;
   initialDepartment?: string;
   initialRoll?: string;
+  initialIsLocked?: boolean;
 }
 
 interface UnclaimedProfile {
@@ -97,6 +99,7 @@ export function OnboardingForm({
   initialDisplayRole,
   initialDepartment = "Computer Science & Engineering (CSE)",
   initialRoll = "",
+  initialIsLocked = false,
 }: OnboardingFormProps) {
   const router = useRouter();
 
@@ -113,16 +116,17 @@ export function OnboardingForm({
     initialRole === "Head of Dept (HOD)" ||
     initialRole === "Principal (Admin)"
   );
+  const [isStaffLocked, setIsStaffLocked] = useState<boolean>(initialIsLocked);
 
-  const isStudent = (role || "").toLowerCase().includes("student");
-  const isPrincipal = (role || "").toLowerCase().includes("principal") || (role || "").toLowerCase().includes("admin");
+  const isStudent = role === "Student";
+  const isPrincipal = role === "Principal" || role === "Principal (Admin)" || (role || "").includes("Principal");
   const isTeacherOrHod = !isStudent && !isPrincipal;
 
   const isPersonal = isPersonalEmail(initialEmail) && !isPrincipalSuperAdmin(initialEmail);
   const isSsoBlocked = isPersonal && !isPrincipal && !isWhitelistedStaff;
 
   const [name, setName] = useState(initialName);
-  const [rollNumber, setRollNumber] = useState(initialRoll);
+  const [rollNumber, setRollNumber] = useState(initialRole === "Student" ? initialRoll : "");
   const [department, setDepartment] = useState(
     isPrincipal ? "Office of the Principal & Institutional Affairs" : initialDepartment
   );
@@ -155,11 +159,22 @@ export function OnboardingForm({
           const isStaff = data.assignedRole !== "Student";
           setIsWhitelistedStaff(Boolean(data.isWhitelisted || isStaff));
 
+          if (data.isStaffLocked !== undefined) {
+            setIsStaffLocked(Boolean(data.isStaffLocked));
+          } else if (isStaff) {
+            setIsStaffLocked(true);
+          }
+
+          if (data.name) {
+            setName(data.name);
+          }
+          if (data.department) {
+            setDepartment(data.department);
+          }
+
           if (data.assignedRole.toLowerCase().includes("principal") || data.assignedRole.toLowerCase().includes("admin")) {
             setDepartment("Office of the Principal & Institutional Affairs");
             setDesignation("Principal (Admin)");
-          } else if (data.user?.department) {
-            setDepartment(data.user.department);
           }
         }
       } catch (err) {
@@ -403,16 +418,26 @@ export function OnboardingForm({
         {/* Full Name & Verified Institutional Email */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-slate-300 font-semibold mb-1.5">
-              Full Official Name
+            <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+              <span>Full Official Name</span>
+              {isStaffLocked && (
+                <span className="text-[10px] text-sky-400 font-mono flex items-center gap-1 font-semibold">
+                  <Lock className="w-3 h-3" /> Locked by Whitelist
+                </span>
+              )}
             </label>
             <input
               type="text"
               required
+              disabled={isStaffLocked}
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. John Doe"
-              className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-xs sm:text-sm"
+              className={`w-full px-4 py-3 rounded-xl border text-xs sm:text-sm ${
+                isStaffLocked
+                  ? "bg-slate-900/80 border-sky-500/30 text-sky-200 cursor-not-allowed font-medium select-none"
+                  : "bg-slate-950/80 border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400"
+              }`}
             />
           </div>
 
@@ -484,12 +509,23 @@ export function OnboardingForm({
         <div>
           <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
             <span>Academic Department</span>
-            <span className="text-[10px] text-sky-400">Parameter 1 of 4</span>
+            {isStaffLocked ? (
+              <span className="text-[10px] text-sky-400 font-mono flex items-center gap-1 font-semibold">
+                <Lock className="w-3 h-3" /> Whitelist Department Locked
+              </span>
+            ) : role === "Student" ? (
+              <span className="text-[10px] text-sky-400">Parameter 1 of 4</span>
+            ) : null}
           </label>
           <select
+            disabled={isStaffLocked || isPrincipal}
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs sm:text-sm cursor-pointer"
+            className={`w-full px-4 py-3 rounded-xl border text-xs sm:text-sm ${
+              isStaffLocked || isPrincipal
+                ? "bg-slate-900/80 border-sky-500/30 text-sky-200 cursor-not-allowed font-medium select-none"
+                : "bg-slate-950/80 border-white/10 text-white focus:outline-none focus:border-sky-400 cursor-pointer"
+            }`}
           >
             {DEPARTMENTS.map((dept) => (
               <option key={dept} value={dept} className="bg-slate-900 text-white">
@@ -501,8 +537,9 @@ export function OnboardingForm({
 
         {/* ============================================================== */}
         {/* STUDENT CONDITIONAL PARAMETERS                                 */}
+        {/* STRICT CONDITIONAL: ONLY RENDER IF role === 'Student'          */}
         {/* ============================================================== */}
-        {isStudent && (
+        {role === "Student" ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -614,12 +651,13 @@ export function OnboardingForm({
               </span>
             </div>
           </motion.div>
-        )}
+        ) : null}
 
         {/* ============================================================== */}
         {/* TEACHER / HOD CONDITIONAL FIELDS & ROUTINE CLAIMING            */}
+        {/* STRICT: ONLY RENDER IF isTeacherOrHod                          */}
         {/* ============================================================== */}
-        {isTeacherOrHod && (
+        {isTeacherOrHod ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -627,40 +665,41 @@ export function OnboardingForm({
             className="space-y-4 pt-3 border-t border-white/10"
           >
             <div>
-              <label className="block text-slate-300 font-semibold mb-1.5">
-                Faculty Designation
+              <label className="block text-slate-300 font-semibold mb-1.5 flex items-center justify-between">
+                <span>Faculty Designation</span>
+                <span className="text-[10px] text-emerald-400 font-mono font-semibold">Editable Field</span>
               </label>
               <select
                 value={designation}
                 onChange={(e) => setDesignation(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-sky-400 text-xs sm:text-sm cursor-pointer"
+                className="w-full px-4 py-3 rounded-xl bg-slate-950/80 border border-emerald-500/40 text-emerald-200 focus:outline-none focus:border-emerald-400 text-xs sm:text-sm cursor-pointer font-semibold shadow-inner"
               >
                 {DESIGNATIONS.map((desig) => (
-                  <option key={desig} value={desig} className="bg-slate-900">
+                  <option key={desig} value={desig} className="bg-slate-900 text-white">
                     {desig}
                   </option>
                 ))}
               </select>
             </div>
 
-            {/* Claim Unassigned Routine Profile Dropdown */}
+            {/* Claim Unassigned Routine Profile Dropdown (Yellow Alert Box) */}
             {unclaimedSlots.length > 0 && (
-              <div className="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/30 space-y-2">
+              <div className="p-4 rounded-2xl bg-amber-500/10 border-2 border-amber-500/40 space-y-2 shadow-[0_0_20px_rgba(245,158,11,0.15)]">
                 <label className="block text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>Claim Your Timetable Routine Slots (Recommended)</span>
                 </label>
-                <p className="text-[11px] text-slate-300">
+                <p className="text-[11px] text-slate-200 leading-relaxed">
                   The HOD has uploaded timetable routines with unassigned faculty slots. Select your name to automatically link all scheduled lectures to your profile:
                 </p>
                 <select
                   value={claimedFacultyName}
                   onChange={(e) => setClaimedFacultyName(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-amber-500/40 text-amber-200 text-xs focus:outline-none focus:border-amber-400"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-amber-500/50 text-amber-200 text-xs focus:outline-none focus:border-amber-400 cursor-pointer font-semibold"
                 >
                   <option value="">-- No timetable slot to claim (New Faculty) --</option>
                   {unclaimedSlots.map((slot, idx) => (
-                    <option key={idx} value={slot.teacherName}>
+                    <option key={idx} value={slot.teacherName} className="bg-slate-900 text-white">
                       {slot.teacherName} ({slot.classCount} classes &bull; {slot.subjects.slice(0, 2).join(", ")})
                     </option>
                   ))}
@@ -675,12 +714,13 @@ export function OnboardingForm({
               </span>
             </div>
           </motion.div>
-        )}
+        ) : null}
 
         {/* ============================================================== */}
         {/* PRINCIPAL CONDITIONAL FIELDS & SUPERVISION SCOPE              */}
+        {/* STRICT: ONLY RENDER IF isPrincipal                            */}
         {/* ============================================================== */}
-        {isPrincipal && (
+        {isPrincipal ? (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -697,7 +737,7 @@ export function OnboardingForm({
               </p>
             </div>
           </motion.div>
-        )}
+        ) : null}
 
         {/* Submit Button */}
         <div className="pt-4">

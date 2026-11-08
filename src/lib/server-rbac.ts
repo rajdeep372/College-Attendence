@@ -9,6 +9,8 @@ export interface ResolvedRoleInfo {
   displayRole: string;
   rawRole: string;
   isWhitelisted: boolean;
+  name?: string;
+  department?: string;
 }
 
 /**
@@ -62,6 +64,8 @@ export async function resolveInstitutionalRole(email?: string | null): Promise<R
       displayRole: "Principal (Admin)",
       rawRole: "Principal (Admin)",
       isWhitelisted: true,
+      name: "Institutional Principal & Executive Dean",
+      department: "Office of the Principal & Institutional Affairs",
     };
   }
 
@@ -97,6 +101,8 @@ export async function resolveInstitutionalRole(email?: string | null): Promise<R
         displayRole: staffDoc.role.trim() || normalized.displayRole,
         rawRole: staffDoc.role,
         isWhitelisted: true,
+        name: staffDoc.name ? staffDoc.name.trim() : "",
+        department: staffDoc.department ? staffDoc.department.trim() : "",
       };
     }
   } catch (err) {

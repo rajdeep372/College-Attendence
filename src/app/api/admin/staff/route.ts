@@ -101,6 +101,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (!name || !name.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Full Official Name is required for institutional staff records." },
+        { status: 400 }
+      );
+    }
+
+    if (!department || !department.trim()) {
+      return NextResponse.json(
+        { success: false, error: "Academic Department is required for curriculum mapping." },
+        { status: 400 }
+      );
+    }
+
     // Role must be strictly 'Faculty / Teacher' or 'Head of Dept (HOD)'
     const validRoles = ["Faculty / Teacher", "Head of Dept (HOD)"];
     let cleanRole = (role || "").trim();
@@ -234,3 +248,4 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
+

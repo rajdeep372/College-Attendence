@@ -81,6 +81,16 @@ export function StaffAccessManagement() {
       return;
     }
 
+    if (!name.trim()) {
+      setErrorMessage("Full Official Name is required to properly identify the staff member.");
+      return;
+    }
+
+    if (!department.trim()) {
+      setErrorMessage("Please select an Academic Department for the staff member.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch("/api/admin/staff", {
@@ -258,11 +268,27 @@ export function StaffAccessManagement() {
             </select>
           </div>
 
+          {/* Full Official Name */}
+          <div className="lg:col-span-1">
+            <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-sky-400" />
+              <span>Full Official Name *</span>
+            </label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Dr. Aditya Sen"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-xs"
+            />
+          </div>
+
           {/* Department */}
           <div className="lg:col-span-1">
             <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5 text-sky-400" />
-              <span>Academic Department</span>
+              <span>Academic Department *</span>
             </label>
             <select
               value={department}
@@ -276,27 +302,12 @@ export function StaffAccessManagement() {
               ))}
             </select>
           </div>
-
-          {/* Optional Name */}
-          <div className="lg:col-span-1">
-            <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
-              <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
-              <span>Staff Name (Optional)</span>
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Dr. Aditya Sen"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 text-xs"
-            />
-          </div>
         </div>
 
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            disabled={isSubmitting || !email.trim()}
+            disabled={isSubmitting || !email.trim() || !name.trim() || !department.trim()}
             className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-sky-500 via-blue-600 to-indigo-600 hover:from-sky-400 hover:to-blue-500 shadow-[0_0_20px_rgba(56,189,248,0.35)] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
@@ -440,3 +451,4 @@ export function StaffAccessManagement() {
     </div>
   );
 }
+

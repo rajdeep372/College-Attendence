@@ -36,10 +36,12 @@ export default async function OnboardingPage() {
   const roleInfo = await resolveInstitutionalRole(primaryEmail);
   const serverAssignedRole = roleInfo.role;
 
-  const derivedDepartment =
-    dbUser?.department || (serverAssignedRole === "Principal" ? "Office of the Principal & Institutional Affairs" : deriveDepartment(primaryEmail));
-  const derivedRoll = dbUser?.rollNumber || deriveRollNumber(primaryEmail, serverAssignedRole);
-  const fullName = dbUser?.name || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "";
+  const isPrincipal = serverAssignedRole.includes("Principal");
+  const isStudent = serverAssignedRole === "Student";
+
+  const fullName = roleInfo.name || dbUser?.name || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "";
+  const derivedDepartment = roleInfo.department || dbUser?.department || (isPrincipal ? "Office of the Principal & Institutional Affairs" : "Computer Science & Engineering (CSE)");
+  const derivedRoll = isStudent ? (dbUser?.rollNumber || deriveRollNumber(primaryEmail, serverAssignedRole)) : (isPrincipal ? "ADM-PRIN" : "");
 
   return (
     <div className="min-h-screen flex flex-col justify-between w-full max-w-full overflow-x-hidden bg-slate-950/80">
@@ -76,6 +78,7 @@ export default async function OnboardingPage() {
           initialDisplayRole={roleInfo.displayRole}
           initialDepartment={derivedDepartment}
           initialRoll={derivedRoll}
+          initialIsLocked={roleInfo.isWhitelisted && !isStudent}
         />
       </main>
 

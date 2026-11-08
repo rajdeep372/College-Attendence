@@ -32,6 +32,7 @@ export async function GET() {
     const isBlocked = isPersonal && !roleInfo.isWhitelisted;
 
     const dbUser = await User.findOne({ clerkId: clerkUser.id }).lean();
+    const isStaffLocked = Boolean(roleInfo.isWhitelisted && assignedRole !== "Student");
 
     return NextResponse.json({
       success: true,
@@ -41,6 +42,9 @@ export async function GET() {
       isPersonal,
       isBlocked,
       isWhitelisted: roleInfo.isWhitelisted,
+      isStaffLocked,
+      name: roleInfo.name || dbUser?.name || `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "",
+      department: roleInfo.department || dbUser?.department || (assignedRole.includes("Principal") ? "Office of the Principal & Institutional Affairs" : "Computer Science & Engineering (CSE)"),
       onboarded: Boolean(dbUser?.onboarded),
       user: dbUser,
       targetDashboard: getRoleDashboardPath(assignedRole),
@@ -68,6 +72,7 @@ export async function POST(req: NextRequest) {
     const clerkUserEmail = (clerkUser.emailAddresses?.[0]?.emailAddress || "").toLowerCase().trim();
 
     let assignedRole: UserRole = "Student";
+    let staffDoc: { email?: string; role?: string; name?: string; department?: string } | null = null;
 
     // Check 1: If email matches principal, lock assignedRole = 'Principal (Admin)'
     if (clerkUserEmail === "chatterjeer477@gmail.com" || isPrincipalSuperAdmin(clerkUserEmail)) {
@@ -77,17 +82,16 @@ export async function POST(req: NextRequest) {
       const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const regexQuery = new RegExp(`^${escapeRegex(clerkUserEmail)}$`, "i");
 
-      let staffDoc = null;
       if (mongoose.connection?.db) {
-        staffDoc = await mongoose.connection.collection("authorizedstaffs").findOne({
+        staffDoc = (await mongoose.connection.collection("authorizedstaffs").findOne({
           $or: [{ email: clerkUserEmail }, { email: regexQuery }],
-        });
+        })) as any;
       }
 
       if (!staffDoc) {
-        staffDoc = await AuthorizedStaff.findOne({
+        staffDoc = (await AuthorizedStaff.findOne({
           $or: [{ email: clerkUserEmail }, { email: regexQuery }],
-        }).lean();
+        }).lean()) as any;
       }
 
       if (staffDoc && staffDoc.role) {
@@ -143,16 +147,35 @@ export async function POST(req: NextRequest) {
     const isPrincipal = assignedRole === "Principal (Admin)" || assignedRole === "Principal";
     const isTeacherOrHod = !isStudent && !isPrincipal;
 
+    // Merge pre-filled data from authorizedstaffs whitelist for staff
+    let finalName = name && name.trim() ? name.trim() : "";
+    let finalDepartment = department && department.trim() ? department.trim() : "";
+
+    if (staffDoc) {
+      if (staffDoc.name && staffDoc.name.trim()) {
+        finalName = staffDoc.name.trim();
+      }
+      if (staffDoc.department && staffDoc.department.trim()) {
+        finalDepartment = staffDoc.department.trim();
+      }
+    } else if (isPrincipal) {
+      finalName = name?.trim() || "Institutional Principal & Executive Dean";
+      finalDepartment = "Office of the Principal & Institutional Affairs";
+    }
+
+    if (!finalName) {
+      finalName = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Academic Scholar";
+    }
+    if (!finalDepartment) {
+      finalDepartment = "Computer Science & Engineering (CSE)";
+    }
+
     if (isStudent && (!rollNumber || !rollNumber.trim())) {
       return NextResponse.json(
         { success: false, error: "Roll Number is strictly required for students." },
         { status: 400 }
       );
     }
-
-    const fullName = name && name.trim()
-      ? name.trim()
-      : `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Academic Scholar";
 
     let resolvedAcademicYear = academicYear;
     if (!resolvedAcademicYear && isStudent) {
@@ -167,24 +190,24 @@ export async function POST(req: NextRequest) {
     const cleanDesignation = isPrincipal
       ? "Principal (Admin)"
       : isTeacherOrHod
-      ? designation.trim() || (assignedRole === "Head of Dept (HOD)" ? "Head of Department (HOD)" : "Faculty Instructor")
+      ? designation.trim() || (assignedRole === "Head of Dept (HOD)" ? "Head of Department (HOD)" : "Assistant Professor")
       : "";
 
     const cleanRoll = isStudent
       ? rollNumber.trim().toUpperCase()
       : isPrincipal
       ? "ADM-PRIN"
-      : (rollNumber || "").trim().toUpperCase();
+      : "";
 
     // 2. Proper DB Profile Sync (The Connection)
     // Upsert operational profile into main users MongoDB collection with assignedRole
     const updatePayload: Record<string, unknown> = {
       clerkId: clerkUser.id,
       email: clerkUserEmail,
-      name: fullName,
+      name: finalName,
       phone: phone.trim(),
       role: assignedRole,
-      department: department.trim(),
+      department: finalDepartment,
       rollNumber: cleanRoll,
       batchDuration: isStudent ? (batchDuration || "2024-2028").trim() : undefined,
       academicYear: isStudent ? resolvedAcademicYear : undefined,
