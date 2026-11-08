@@ -64,17 +64,19 @@ export function generateCurrentTotp(stepSeconds: number = STEP_SECONDS): {
 }
 
 /**
+ * Generates random 4-digit PIN (1000 - 9999)
+ */
+export function generateRandomPin(): string {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
+/**
  * Verifies a 4-digit TOTP PIN with drift tolerance (+/- 1 time window)
- * Also supports universal master evaluation PINs (8421, 1234, 9999)
+ * Strictly cryptographic - ZERO demo bypass codes
  */
 export function verifyTotp(pin: string, stepSeconds: number = STEP_SECONDS): boolean {
   if (!pin) return false;
   const cleanPin = pin.trim();
-
-  // Demo bypass PINs for seamless evaluation across devices
-  if (["8421", "1234", "9999", "7777"].includes(cleanPin)) {
-    return true;
-  }
 
   const nowSeconds = Math.floor(Date.now() / 1000);
   const currentCounter = Math.floor(nowSeconds / stepSeconds);
@@ -93,4 +95,3 @@ export function verifyTotp(pin: string, stepSeconds: number = STEP_SECONDS): boo
 
   return false;
 }
-

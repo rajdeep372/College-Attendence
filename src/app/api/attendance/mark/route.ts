@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import Attendance from "@/models/Attendance";
-import Routine from "@/models/Routine";
+import KioskSession from "@/models/KioskSession";
 import User, { IUser } from "@/models/User";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose from "mongoose";
 import { 
   COLLEGE_COORDINATES, 
   calculateHaversineDistance, 
-  verifyTotp 
 } from "@/lib/totp";
 
 export async function POST(req: NextRequest) {
@@ -21,34 +20,39 @@ export async function POST(req: NextRequest) {
       pin, 
       latitude, 
       longitude, 
-      studentId, 
-      attendanceId 
+      studentId 
     } = body;
 
     const submittedPin = (totp || pin || "").toString().trim();
 
-    // 1. Validate inputs
-    if (!submittedPin) {
+    // 1. Validate 4-digit PIN input
+    if (!submittedPin || submittedPin.length !== 4 || !/^\d{4}$/.test(submittedPin)) {
       return NextResponse.json(
         { 
           success: false, 
-          error: "A 4-digit TOTP PIN is required." 
+          error: "A valid 4-digit PIN is strictly required." 
         },
         { status: 400 }
       );
     }
 
-    if (typeof latitude !== "number" || typeof longitude !== "number" || isNaN(latitude) || isNaN(longitude)) {
+    // 2. Validate Real GPS Coordinates
+    if (
+      typeof latitude !== "number" || 
+      typeof longitude !== "number" || 
+      isNaN(latitude) || 
+      isNaN(longitude)
+    ) {
       return NextResponse.json(
         { 
           success: false, 
-          error: "Valid GPS latitude and longitude coordinates are required from your device." 
+          error: "Valid GPS latitude and longitude coordinates are strictly required from your device." 
         },
         { status: 400 }
       );
     }
 
-    // 2. Haversine distance calculation to fixed College Coordinate
+    // 3. Aggressive Backend Geofencing (Haversine Distance <= 50m)
     const distanceMeters = calculateHaversineDistance(
       latitude,
       longitude,
@@ -56,37 +60,22 @@ export async function POST(req: NextRequest) {
       COLLEGE_COORDINATES.longitude
     );
 
-    const isWithinGeofence = distanceMeters <= COLLEGE_COORDINATES.allowedRadiusMeters;
+    const maxAllowedMeters = COLLEGE_COORDINATES.allowedRadiusMeters || 50;
 
-    // 3. Verify TOTP PIN
-    const isTotpValid = verifyTotp(submittedPin);
-
-    if (!isTotpValid) {
+    if (distanceMeters > maxAllowedMeters) {
       return NextResponse.json(
         {
           success: false,
-          error: "Invalid or expired TOTP PIN. Please check the 4-digit code displayed on the teacher's screen.",
+          error: `Geofence violation: You are ${distanceMeters} meters away from ${COLLEGE_COORDINATES.name}. You must be physically present within ${maxAllowedMeters}m radius of campus coordinates [${COLLEGE_COORDINATES.latitude}, ${COLLEGE_COORDINATES.longitude}] to check in.`,
           distanceMeters,
-          isWithinGeofence,
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!isWithinGeofence) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Geofence violation: You are ${distanceMeters} meters away from ${COLLEGE_COORDINATES.name}. You must be physically present within ${COLLEGE_COORDINATES.allowedRadiusMeters}m radius of campus coordinates [${COLLEGE_COORDINATES.latitude}, ${COLLEGE_COORDINATES.longitude}] to check in.`,
-          distanceMeters,
-          maxAllowedMeters: COLLEGE_COORDINATES.allowedRadiusMeters,
+          maxAllowedMeters,
           isWithinGeofence: false,
         },
         { status: 403 }
       );
     }
 
-    // 4. Resolve Student Document
+    // 4. Resolve Authenticated Student (Zero mock fallback)
     let student: (IUser & { _id: mongoose.Types.ObjectId }) | null = null;
     try {
       const clerkUser = await currentUser();
@@ -102,93 +91,160 @@ export async function POST(req: NextRequest) {
     }
 
     if (!student) {
-      // Find any student in DB or create fallback student
-      student = await User.findOne({ role: "Student" });
-      if (!student) {
-        student = await User.create({
-          clerkId: `student_totp_${Date.now()}`,
-          name: "Aryan Sharma",
-          email: "aryan.sharma@college.edu",
-          role: "Student",
-          department: "Computer Science",
-          profilePicture: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80",
-        });
-      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Student profile not found. Please log in or complete onboarding to mark attendance.",
+        },
+        { status: 401 }
+      );
     }
 
+    if (student.role !== "Student") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Only registered students can check in to classroom attendance sessions.",
+        },
+        { status: 403 }
+      );
+    }
+
+    // 5. Look up Active Kiosk Session in MongoDB with 5-second grace window for network drift
+    const graceExpiry = new Date(Date.now() - 5000);
+    const kioskSession = await KioskSession.findOne({
+      pin: submittedPin,
+      isActive: true,
+      expiresAt: { $gte: graceExpiry },
+    }).sort({ createdAt: -1 });
+
+    if (!kioskSession) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid or expired PIN. Please check the 4-digit code currently displayed on the teacher's classroom console.",
+          distanceMeters,
+        },
+        { status: 400 }
+      );
+    }
+
+    // 6. Strict Cohort Verification (Department, Semester, Section)
+    const normalize = (str?: string) => (str || "").trim().toLowerCase();
+    
+    const studentDept = normalize(student.department);
+    const sessionDept = normalize(kioskSession.department);
+    const deptMatch =
+      studentDept === sessionDept ||
+      studentDept.includes(sessionDept) ||
+      sessionDept.includes(studentDept);
+
+    const semMatch = Number(student.semester || 1) === Number(kioskSession.semester);
+
+    const studentSec = normalize(student.section || "Section A");
+    const sessionSec = normalize(kioskSession.section || "Section A");
+    const secMatch = studentSec === sessionSec;
+
+    if (!deptMatch || !semMatch || !secMatch) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Cohort Mismatch: This attendance session is strictly for ${kioskSession.department} Semester ${kioskSession.semester} (${kioskSession.section}). Your registered profile is ${student.department} Semester ${student.semester || "N/A"} (${student.section || "N/A"}). You cannot mark attendance for another cohort's lecture.`,
+          distanceMeters,
+          sessionCohort: {
+            department: kioskSession.department,
+            semester: kioskSession.semester,
+            section: kioskSession.section,
+          },
+          studentCohort: {
+            department: student.department,
+            semester: student.semester,
+            section: student.section,
+          },
+        },
+        { status: 403 }
+      );
+    }
+
+    // 7. Strictly Mark Attendance for THAT Specific Subject and Routine
     const studentObjectId = new mongoose.Types.ObjectId(student._id.toString());
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
 
-    // 5. Find Target Attendance Document
-    let attendanceDoc = null;
+    let attendanceDoc = await Attendance.findOne({
+      subject: kioskSession.subject,
+      department: kioskSession.department,
+      semester: kioskSession.semester,
+      section: kioskSession.section,
+      date: { $gte: startOfDay, $lte: endOfDay },
+    });
 
-    if (attendanceId && mongoose.Types.ObjectId.isValid(attendanceId)) {
-      attendanceDoc = await Attendance.findById(attendanceId);
-    }
-
-    // Find latest attendance where student is marked absent
     if (!attendanceDoc) {
-      attendanceDoc = await Attendance.findOne({
-        absentStudents: studentObjectId,
-      }).sort({ createdAt: -1 });
-    }
+      // Find all students in this cohort to initialize absent list
+      const cohortStudents = await User.find({
+        role: "Student",
+        department: kioskSession.department,
+        semester: kioskSession.semester,
+        section: kioskSession.section,
+      }).select("_id");
 
-    // Or find latest attendance of today
-    if (!attendanceDoc) {
-      attendanceDoc = await Attendance.findOne().sort({ createdAt: -1 });
-    }
-
-    // If no attendance document exists at all, initialize one
-    if (!attendanceDoc) {
-      const defaultRoutine = await Routine.findOne();
-      const defaultTeacher = await User.findOne({ role: "Teacher" });
+      const absentList = cohortStudents
+        .map((s) => s._id)
+        .filter((id) => id.toString() !== studentObjectId.toString());
 
       attendanceDoc = await Attendance.create({
-        routineId: defaultRoutine?._id || new mongoose.Types.ObjectId(),
-        markedBy: defaultTeacher?._id || new mongoose.Types.ObjectId(),
-        absentStudents: [studentObjectId],
-        presentStudents: [],
+        routineId: kioskSession.routineId,
         date: new Date(),
-        department: student.department || defaultRoutine?.department || "Computer Science & Engineering",
-        academicYear: student.academicYear || "3rd Year",
-        semester: student.semester || defaultRoutine?.semester || 1,
-        section: student.section || defaultRoutine?.section || "Section A",
-        subject: defaultRoutine?.subject || "Core Curriculum Lecture",
-        teacherName: defaultTeacher?.name || "Faculty Instructor",
+        timeSlot: kioskSession.timeSlot || "",
+        teacherName: kioskSession.teacherName,
+        subject: kioskSession.subject,
+        department: kioskSession.department,
+        academicYear: kioskSession.academicYear || student.academicYear || "1st Year",
+        semester: kioskSession.semester,
+        section: kioskSession.section,
+        markedBy: kioskSession.teacherId,
+        presentStudents: [studentObjectId],
+        absentStudents: absentList,
       });
+    } else {
+      // Move student from absentStudents -> presentStudents
+      attendanceDoc = await Attendance.findByIdAndUpdate(
+        attendanceDoc._id,
+        {
+          $pull: { absentStudents: studentObjectId },
+          $addToSet: { presentStudents: studentObjectId },
+        },
+        { new: true }
+      );
     }
 
-    // 6. Update Attendance document: Move student from absentStudents -> presentStudents
-    const updatedAttendance = await Attendance.findByIdAndUpdate(
-      attendanceDoc._id,
-      {
-        $pull: { absentStudents: studentObjectId },
-        $addToSet: { presentStudents: studentObjectId },
-      },
-      { new: true }
-    );
-
     console.log(
-      `[Geofenced TOTP] Student ${student.name} (${student._id}) marked Present. Distance: ${distanceMeters}m (Limit: ${COLLEGE_COORDINATES.allowedRadiusMeters}m).`
+      `[Geofenced PIN Check-in] Student ${student.name} (${student.rollNumber || student._id}) marked Present for "${kioskSession.subject}". Proximity: ${distanceMeters}m.`
     );
 
     return NextResponse.json({
       success: true,
-      message: `Verified! Successfully marked Present via Geofenced TOTP (${distanceMeters}m from lecture hall).`,
+      message: `Verified! Successfully marked Present for "${kioskSession.subject}" (${distanceMeters}m from lecture hall).`,
       distanceMeters,
-      allowedRadiusMeters: COLLEGE_COORDINATES.allowedRadiusMeters,
-      collegeCoordinates: {
-        latitude: COLLEGE_COORDINATES.latitude,
-        longitude: COLLEGE_COORDINATES.longitude,
-      },
+      allowedRadiusMeters: maxAllowedMeters,
+      subject: kioskSession.subject,
+      paperCode: kioskSession.paperCode,
+      department: kioskSession.department,
+      semester: kioskSession.semester,
+      section: kioskSession.section,
+      timeSlot: kioskSession.timeSlot,
       student: {
         _id: student._id.toString(),
         name: student.name,
         email: student.email,
+        roll: student.rollNumber || "",
         department: student.department,
       },
-      attendanceId: attendanceDoc._id.toString(),
-      presentCount: updatedAttendance?.presentStudents?.length || 1,
-      absentCount: updatedAttendance?.absentStudents?.length || 0,
+      attendanceId: attendanceDoc?._id.toString(),
+      presentCount: attendanceDoc?.presentStudents?.length || 1,
+      absentCount: attendanceDoc?.absentStudents?.length || 0,
       timestamp: new Date().toISOString(),
     });
   } catch (error: unknown) {
@@ -202,8 +258,7 @@ export async function POST(req: NextRequest) {
       throw error;
     }
     console.error("[API: /api/attendance/mark] Error:", error);
-    const message = error instanceof Error ? error.message : "Error validating geofenced TOTP";
+    const message = error instanceof Error ? error.message : "Error validating geofenced PIN";
     return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }
-

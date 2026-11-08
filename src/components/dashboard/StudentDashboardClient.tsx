@@ -310,6 +310,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
   const subjects = analytics?.subjects || [];
   const circulars = analytics?.recentCirculars || [];
   const leaves = analytics?.leaves || [];
+  const todayRoutines = analytics?.todayRoutines || [];
 
   return (
     <RoleGuard allowedRole="Student" user={currentUser}>
@@ -607,6 +608,57 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               <span className="text-sky-300 font-medium">Auto-Archive on Upgrade</span>
             </div>
           </div>
+        </div>
+
+        {/* Today's Lecture Schedule (Student View) */}
+        <div id="schedule" className="p-6 rounded-3xl glass-card border border-white/10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold text-white mb-1">Today&apos;s Lecture Schedule</h3>
+              <p className="text-xs text-slate-400">
+                Timetable for {currentUser?.department || "Department"} &bull; Sem {currentUser?.semester || 1} ({currentUser?.section || "Section A"})
+              </p>
+            </div>
+            <button
+              onClick={fetchAnalytics}
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition-all cursor-pointer"
+              title="Refresh Schedule"
+            >
+              <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+
+          {!todayRoutines || todayRoutines.length === 0 ? (
+            /* STRICT EMPTY STATE: Rest Day 🌴 - No classes scheduled for today. */
+            <div className="py-10 px-4 text-center rounded-2xl bg-slate-950/40 border border-white/5 flex flex-col items-center justify-center">
+              <span className="text-3xl mb-2">🌴</span>
+              <h4 className="text-base font-bold text-white mb-1">
+                Rest Day 🌴 - No classes scheduled for today.
+              </h4>
+              <p className="text-xs text-slate-400 max-w-md">
+                No lectures are scheduled for your cohort today in the institutional timetable. Enjoy your rest day!
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {todayRoutines.map((r, i) => (
+                <div
+                  key={r._id || i}
+                  className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-mono text-xs font-bold text-sky-400 px-2 py-0.5 rounded bg-sky-950/80 border border-sky-800">
+                        {r.timeSlot}
+                      </span>
+                    </div>
+                    <h5 className="font-bold text-white text-sm mt-1">{r.subject}</h5>
+                    <p className="text-xs text-slate-400 mt-0.5">Faculty: {r.teacherName || "Assigned Faculty"}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Live Subject-Wise Ledger */}

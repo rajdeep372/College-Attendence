@@ -12,8 +12,7 @@ import {
   CheckCircle2, 
   Navigation,
   Compass,
-  Crosshair,
-  Sparkles
+  Crosshair
 } from "lucide-react";
 
 interface StudentTotpModalProps {
@@ -24,11 +23,6 @@ interface StudentTotpModalProps {
   activeSubject?: string;
   activeTimeSlot?: string;
 }
-
-const COLLEGE_COORDS = {
-  latitude: 22.5726,
-  longitude: 88.3639,
-};
 
 export function StudentTotpModal({
   isOpen,
@@ -41,35 +35,24 @@ export function StudentTotpModal({
   const [pin, setPin] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
-  const [gpsSource, setGpsSource] = useState<"classroom" | "real">("classroom");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<{
     message: string;
+    subject?: string;
     distanceMeters: number;
     timestamp?: string;
   } | null>(null);
 
   const obtainCoordinates = (): Promise<{ latitude: number; longitude: number }> => {
     return new Promise((resolve, reject) => {
-      if (gpsSource === "classroom") {
-        // High-precision indoor coordinates with 8m realistic jitter inside the allowed 50m radius
-        const jitterLat = (Math.random() - 0.5) * 0.0001;
-        const jitterLng = (Math.random() - 0.5) * 0.0001;
-        resolve({
-          latitude: COLLEGE_COORDS.latitude + jitterLat,
-          longitude: COLLEGE_COORDS.longitude + jitterLng,
-        });
-        return;
-      }
-
-      if (!navigator.geolocation) {
+      if (typeof window === "undefined" || !navigator.geolocation) {
         reject(new Error("Browser Geolocation is not supported on this device."));
         return;
       }
 
       setIsLocating(true);
-      setStatusMessage("Acquiring high-accuracy GPS fix via satellite...");
+      setStatusMessage("Acquiring high-accuracy GPS fix from device sensors...");
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -83,9 +66,11 @@ export function StudentTotpModal({
           setIsLocating(false);
           let msg = "Could not retrieve GPS coordinates.";
           if (geoError.code === geoError.PERMISSION_DENIED) {
-            msg = "Location permission denied. Please allow location access or switch to Classroom GPS mode.";
+            msg = "Location permission denied. You must grant device GPS location access to verify physical presence within campus.";
           } else if (geoError.code === geoError.TIMEOUT) {
-            msg = "Location acquisition timed out.";
+            msg = "GPS location acquisition timed out. Please ensure GPS/Location is enabled with high accuracy.";
+          } else if (geoError.code === geoError.POSITION_UNAVAILABLE) {
+            msg = "GPS position unavailable. Please ensure your device has a clear signal.";
           }
           reject(new Error(msg));
         },
@@ -101,7 +86,7 @@ export function StudentTotpModal({
 
     const cleanPin = pin.trim();
     if (cleanPin.length !== 4) {
-      setErrorMessage("Please enter the complete 4-digit TOTP PIN from your teacher's console.");
+      setErrorMessage("Please enter the complete 4-digit PIN displayed on your teacher's classroom console.");
       return;
     }
 
@@ -109,14 +94,14 @@ export function StudentTotpModal({
       setIsSubmitting(true);
       const userCoords = await obtainCoordinates();
 
-      setStatusMessage("Verifying TOTP Hash & Geofence (<50m) with College Server...");
+      setStatusMessage("Verifying PIN & Campus Geofence (<50m) with institutional server...");
 
       const res = await fetch("/api/attendance/mark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          totp: cleanPin,
           pin: cleanPin,
+          totp: cleanPin,
           latitude: userCoords.latitude,
           longitude: userCoords.longitude,
           studentId,
@@ -131,7 +116,8 @@ export function StudentTotpModal({
 
       setSuccessResult({
         message: data.message || "Attendance recorded successfully!",
-        distanceMeters: data.distanceMeters || 12,
+        subject: data.subject,
+        distanceMeters: data.distanceMeters ?? 0,
         timestamp: data.timestamp,
       });
 
@@ -198,7 +184,7 @@ export function StudentTotpModal({
                 <div>
                   <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-500/10 text-sky-300 border border-sky-500/20 mb-0.5">
                     <Compass className="w-3 h-3 animate-spin" style={{ animationDuration: "10s" }} />
-                    <span>Live Geofence TOTP Station</span>
+                    <span>Live Geofenced PIN Station</span>
                   </div>
                   <h3 className="text-lg font-bold text-white tracking-tight">
                     Mark Classroom Attendance
@@ -231,37 +217,15 @@ export function StudentTotpModal({
               </div>
             )}
 
-            {/* GPS Source Toggle */}
+            {/* Geofence Perimeter Indicator */}
             <div className="mb-5 p-3 rounded-xl bg-slate-950/60 border border-white/10 flex items-center justify-between text-xs">
               <div className="flex items-center gap-2 text-slate-300">
                 <MapPin className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                <span className="text-[11px]">Campus Radius: &le;50m</span>
+                <span className="text-[11px]">Strict Campus Perimeter: &le; 50 Meters</span>
               </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setGpsSource("classroom")}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                    gpsSource === "classroom"
-                      ? "bg-sky-500 text-white shadow-[0_0_10px_rgba(56,189,248,0.4)]"
-                      : "bg-slate-800 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Classroom GPS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setGpsSource("real")}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                    gpsSource === "real"
-                      ? "bg-sky-500 text-white shadow-[0_0_10px_rgba(56,189,248,0.4)]"
-                      : "bg-slate-800 text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Live GPS
-                </button>
-              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                GPS Enforced
+              </span>
             </div>
 
             {/* Success State */}
@@ -310,9 +274,9 @@ export function StudentTotpModal({
             <form onSubmit={handleVerifyAndMark} className="space-y-5">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2 flex items-center justify-between">
-                  <span>Enter 4-Digit Teacher TOTP PIN</span>
+                  <span>Enter 4-Digit Classroom PIN</span>
                   <span className="text-[10px] text-slate-400 font-normal font-mono">
-                    Displayed on classroom console
+                    Projected on teacher&apos;s console
                   </span>
                 </label>
 
@@ -346,12 +310,12 @@ export function StudentTotpModal({
                   {isSubmitting || isLocating ? (
                     <>
                       <RefreshCw className="w-4 h-4 animate-spin" />
-                      <span>Verifying Geofence & Pin...</span>
+                      <span>Acquiring GPS & Verifying...</span>
                     </>
                   ) : (
                     <>
                       <Navigation className="w-4 h-4" />
-                      <span>Verify & Check In Now</span>
+                      <span>Verify GPS & Check In</span>
                     </>
                   )}
                 </button>
@@ -359,7 +323,7 @@ export function StudentTotpModal({
 
               <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 pt-1">
                 <Crosshair className="w-3.5 h-3.5 text-sky-400" />
-                <span>Encrypted GPS distance calculation to college coordinates</span>
+                <span>Strict device GPS distance calculation to campus coordinates</span>
               </div>
             </form>
           </motion.div>
@@ -368,4 +332,3 @@ export function StudentTotpModal({
     </AnimatePresence>
   );
 }
-

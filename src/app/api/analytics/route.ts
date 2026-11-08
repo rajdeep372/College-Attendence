@@ -7,7 +7,7 @@ import Leave from "@/models/Leave";
 import Circular from "@/models/Circular";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose, { Types } from "mongoose";
-import { computeClassStatus } from "@/lib/time-utils";
+import { getIstCurrentTime, computeClassStatus } from "@/lib/time-utils";
 
 export async function GET(req: NextRequest) {
   try {
@@ -202,39 +202,28 @@ export async function GET(req: NextRequest) {
           .lean();
       }
 
-      // Fetch today's routines for this student's department/semester to feed live lecture alerts
-      const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const rawDay = daysOfWeek[new Date().getDay()] || "Monday";
-      const activeDay = rawDay === "Sunday" ? "Monday" : rawDay;
+      // Fetch today's routines for this student's department/semester strictly for current IST day
+      const { currentDay } = getIstCurrentTime();
 
       const routinesToday = await Routine.find({
         department: studentDept,
         semester: studentSem,
         section: studentSec,
-        dayOfWeek: activeDay as any,
+        dayOfWeek: currentDay,
       })
         .populate("teacherId", "name email")
         .sort({ timeSlot: 1 })
         .lean();
 
-      // If no routines for today, fetch routines strictly for this department, semester, and section
-      const fallbackRoutines = routinesToday.length > 0 
-        ? routinesToday 
-        : await Routine.find({ 
-            department: studentDept,
-            semester: studentSem,
-            section: studentSec,
-          })
-            .populate("teacherId", "name email")
-            .limit(4)
-            .lean();
-
+      // STRICT: If no routines for currentDay (e.g. Sunday or rest day), do NOT fall back to other days
       const todayRoutines: any[] = [];
-      for (const r of fallbackRoutines) {
+      for (const r of routinesToday) {
         if ((r as any).classes && Array.isArray((r as any).classes) && (r as any).classes.length > 0) {
           for (const c of (r as any).classes) {
             todayRoutines.push({
               _id: r._id.toString(),
+              classId: c._id ? c._id.toString() : undefined,
+              paperCode: c.paperCode || "",
               subject: c.subject,
               timeSlot: c.timeSlot,
               dayOfWeek: r.dayOfWeek,
@@ -244,6 +233,7 @@ export async function GET(req: NextRequest) {
         } else if ((r as any).subject) {
           todayRoutines.push({
             _id: r._id.toString(),
+            paperCode: (r as any).paperCode || "",
             subject: (r as any).subject,
             timeSlot: (r as any).timeSlot,
             dayOfWeek: r.dayOfWeek,
@@ -281,29 +271,18 @@ export async function GET(req: NextRequest) {
         teacherObjectId = dbUser._id as Types.ObjectId;
       }
 
-      const daysOfWeek = ["Monday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const activeDay = daysOfWeek[new Date().getDay()] || "Monday";
+      const { currentDay } = getIstCurrentTime();
 
-      // Query routines assigned to this teacher
-      const routineQuery: Record<string, unknown> = { dayOfWeek: activeDay };
+      // Query routines assigned strictly for currentDay in IST (Asia/Kolkata)
+      const routineQuery: Record<string, unknown> = { dayOfWeek: currentDay };
       if (teacherObjectId) {
         routineQuery.$or = [{ teacherId: teacherObjectId }, { "classes.teacherId": teacherObjectId }];
       } else if (department) {
         routineQuery.department = department;
       }
 
-      let todayRoutines = await Routine.find(routineQuery).lean();
-
-      // Fallback: if no routines found for today, fetch all routines for this teacher or department
-      if (todayRoutines.length === 0) {
-        todayRoutines = await Routine.find(
-          teacherObjectId
-            ? { $or: [{ teacherId: teacherObjectId }, { "classes.teacherId": teacherObjectId }] }
-            : { department: department || { $exists: true } }
-        )
-          .limit(5)
-          .lean();
-      }
+      // STRICT: No fallback to other days. If today is Sunday or no classes scheduled, return empty list []
+      const todayRoutines = await Routine.find(routineQuery).lean();
 
       // Query recent attendance marked by this teacher or in this department
       const attendanceLogs = await Attendance.find(
@@ -376,6 +355,8 @@ export async function GET(req: NextRequest) {
 
             formattedClasses.push({
               _id: r._id.toString(),
+              routineId: r._id.toString(),
+              classId: c._id ? c._id.toString() : undefined,
               code: c.paperCode || c.subject.split(" ")[0] || `CS-${500 + classCounter * 2}`,
               title: c.subject,
               time: c.timeSlot,
@@ -402,6 +383,7 @@ export async function GET(req: NextRequest) {
 
           formattedClasses.push({
             _id: r._id.toString(),
+            routineId: r._id.toString(),
             code: (r as any).paperCode || (r as any).subject.split(" ")[0] || `CS-${500 + classCounter * 2}`,
             title: (r as any).subject,
             time: (r as any).timeSlot,

@@ -15,7 +15,7 @@ export interface IRoutine extends Document {
   academicYear: string;
   semester: number;
   section: string;
-  dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday";
+  dayOfWeek: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
   classes: IRoutineClass[];
   // Backwards compatibility optional fields
   paperCode?: string;
@@ -94,7 +94,7 @@ const RoutineSchema = new Schema<IRoutine>(
     dayOfWeek: {
       type: String,
       required: [true, "Day of week is required"],
-      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      enum: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
       index: true,
     },
     classes: {

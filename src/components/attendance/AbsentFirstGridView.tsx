@@ -46,6 +46,18 @@ interface RoutineDetails {
   dayOfWeek: string;
 }
 
+interface AvailableClass {
+  routineId: string;
+  classId?: string;
+  subject: string;
+  paperCode: string;
+  timeSlot: string;
+  department: string;
+  academicYear: string;
+  semester: number;
+  section: string;
+}
+
 const DEPARTMENTS = [
   "Computer Science & Engineering",
   "Information Technology",
@@ -78,6 +90,7 @@ export function AbsentFirstGridView() {
   const [section, setSection] = useState("Section A");
   const [subjectName, setSubjectName] = useState("Distributed Cloud Systems");
   const [timeSlot, setTimeSlot] = useState("11:30 AM - 12:30 PM");
+  const [availableClasses, setAvailableClasses] = useState<AvailableClass[]>([]);
 
   // Set of student IDs marked ABSENT
   const [absentIds, setAbsentIds] = useState<Set<string>>(new Set());
@@ -139,10 +152,27 @@ export function AbsentFirstGridView() {
         throw new Error(data.error || "Failed to load class roster");
       }
       setStudents(data.students || []);
+      if (data.availableClasses) {
+        setAvailableClasses(data.availableClasses);
+        if (data.availableClasses.length > 0) {
+          const matching =
+            data.availableClasses.find(
+              (c: AvailableClass) => c.semester === targetSem && c.section === targetSec
+            ) || data.availableClasses[0];
+
+          setSubjectName(matching.subject);
+          setTimeSlot(matching.timeSlot);
+        } else {
+          setSubjectName("");
+          setTimeSlot("");
+        }
+      }
       if (data.routine) {
         setRoutine(data.routine);
-        if (data.routine.subject) setSubjectName(data.routine.subject);
-        if (data.routine.timeSlot) setTimeSlot(data.routine.timeSlot);
+        if (!data.availableClasses || data.availableClasses.length === 0) {
+          if (data.routine.subject) setSubjectName(data.routine.subject);
+          if (data.routine.timeSlot) setTimeSlot(data.routine.timeSlot);
+        }
       }
       if (data.teacher?._id) setTeacherId(data.teacher._id);
       if (data.teacher?.name) setTeacherName(data.teacher.name);
@@ -367,26 +397,70 @@ export function AbsentFirstGridView() {
           </select>
         </div>
 
-        {/* 5. Subject */}
+        {/* 5. Subject Dropdown (Fetched from MongoDB Routine collection) */}
         <div>
           <label className="block text-slate-400 font-medium mb-1">Class / Subject</label>
-          <input
-            type="text"
+          <select
             value={subjectName}
-            onChange={(e) => setSubjectName(e.target.value)}
-            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400"
-          />
+            onChange={(e) => {
+              const selectedSubject = e.target.value;
+              setSubjectName(selectedSubject);
+              const matched = availableClasses.find((c) => c.subject === selectedSubject);
+              if (matched) {
+                setTimeSlot(matched.timeSlot);
+                if (matched.semester !== semester || matched.section !== section) {
+                  setSemester(matched.semester);
+                  setSection(matched.section);
+                  setAcademicYear(matched.academicYear || academicYear);
+                  fetchClassRoster(matched.department, matched.academicYear || academicYear, matched.semester, matched.section);
+                }
+              }
+            }}
+            disabled={availableClasses.length === 0}
+            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400 cursor-pointer disabled:opacity-50"
+          >
+            {availableClasses.length === 0 ? (
+              <option value="">No scheduled subjects today</option>
+            ) : (
+              Array.from(new Set(availableClasses.map((c) => c.subject))).map((sub) => {
+                const item = availableClasses.find((c) => c.subject === sub);
+                return (
+                  <option key={sub} value={sub} className="bg-slate-900 text-white">
+                    {sub} {item?.paperCode ? `(${item.paperCode})` : ""}
+                  </option>
+                );
+              })
+            )}
+          </select>
         </div>
 
-        {/* 6. Time Slot */}
+        {/* 6. Time Slot Dropdown (Fetched from MongoDB Routine collection) */}
         <div>
           <label className="block text-slate-400 font-medium mb-1">Time Slot</label>
-          <input
-            type="text"
+          <select
             value={timeSlot}
             onChange={(e) => setTimeSlot(e.target.value)}
-            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400"
-          />
+            disabled={availableClasses.length === 0}
+            className="w-full px-2.5 py-2 rounded-xl bg-slate-900 border border-white/10 text-white font-semibold focus:outline-none focus:border-sky-400 cursor-pointer disabled:opacity-50"
+          >
+            {availableClasses.length === 0 ? (
+              <option value="">No scheduled slots today</option>
+            ) : (
+              Array.from(
+                new Set(
+                  availableClasses
+                    .filter((c) => !subjectName || c.subject === subjectName)
+                    .map((c) => c.timeSlot)
+                    .concat(availableClasses.map((c) => c.timeSlot))
+                    .filter(Boolean)
+                )
+              ).map((slot) => (
+                <option key={slot} value={slot} className="bg-slate-900 text-white">
+                  {slot}
+                </option>
+              ))
+            )}
+          </select>
         </div>
       </div>
 
