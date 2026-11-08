@@ -58,7 +58,7 @@ export default function RootLayout({
     >
       <body 
         suppressHydrationWarning 
-        className="min-h-full flex flex-col font-sans bg-slate-950 text-slate-100 selection:bg-sky-500 selection:text-white overflow-x-hidden w-full max-w-full"
+        className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 selection:bg-sky-500 selection:text-white overflow-x-hidden w-full max-w-full transition-colors duration-200"
       >
         <ThemeProvider
           attribute="class"

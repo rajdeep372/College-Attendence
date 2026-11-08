@@ -192,7 +192,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
   useEffect(() => {
     fetchAnalytics();
 
-    // Check device geolocation
+    // Check device geolocation with strict high accuracy
     if (typeof window !== "undefined" && navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -211,13 +211,22 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               : `Outside Campus (${(dist / 1000).toFixed(1)} km)`,
           });
         },
-        () => {
+        (geoError) => {
+          let statusText = "Campus GPS Idle / Off";
+          if (geoError?.code === 1) {
+            statusText = "GPS Blocked (Enable Location Permissions)";
+          } else if (geoError?.code === 2) {
+            statusText = "GPS Signal Weak / Unavailable";
+          } else if (geoError?.code === 3) {
+            statusText = "GPS Timed Out (Weak Signal)";
+          }
           setGeoStatus({
             insideCampus: false,
             distanceMeters: null,
-            statusText: "Campus GPS idle",
+            statusText,
           });
-        }
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     }
   }, [currentUser]);
@@ -379,14 +388,14 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-sky-600/20 blur-3xl pointer-events-none" />
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-300 border border-sky-500/20 mb-3">
-                <Sparkles className="w-3.5 h-3.5" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20 mb-3">
+                <Sparkles className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                 <span>Student Academic Ledger & Attendance Pulse</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
                 Academic Profile & Live Attendance Turnout
               </h1>
-              <p className="mt-1 text-sm text-slate-300 max-w-2xl">
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300 max-w-2xl">
                 Real-time lecture presence monitoring, automated examination eligibility verification, and on-duty leave submissions.
               </p>
             </div>
@@ -404,20 +413,20 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploadingId}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900/80 hover:bg-slate-800 text-sky-300 border border-sky-500/30 shadow-md transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white hover:bg-slate-100 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-sky-700 dark:text-sky-300 border border-sky-300/80 dark:border-sky-500/30 shadow-sm transition-all cursor-pointer"
                 title="Upload soft copy of Campus ID"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-4 h-4 text-sky-600 dark:text-sky-400" />
                 <span>{isUploadingId ? "Saving ID..." : "Upload Soft Copy ID"}</span>
               </button>
 
               <button
                 onClick={handleUpgradeSemester}
                 disabled={isUpgradingSem}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900/80 hover:bg-slate-800 text-emerald-300 border border-emerald-500/30 shadow-md transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-white hover:bg-slate-100 dark:bg-slate-900/80 dark:hover:bg-slate-800 text-emerald-700 dark:text-emerald-300 border border-emerald-300/80 dark:border-emerald-500/30 shadow-sm transition-all cursor-pointer"
                 title="Start a new academic semester session"
               >
-                <ArrowUpCircle className="w-4 h-4 text-emerald-400" />
+                <ArrowUpCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 <span>Upgrade Semester (New Session)</span>
               </button>
 
@@ -448,10 +457,10 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
             <div className="absolute -top-12 -left-12 w-32 h-32 rounded-full bg-sky-500/20 blur-2xl pointer-events-none" />
             
             <div className="relative w-36 h-36 rounded-full border-8 border-sky-500/20 flex flex-col items-center justify-center shadow-[0_0_35px_rgba(56,189,248,0.25)]">
-              <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-cyan-200">
+              <span className="text-3xl sm:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-cyan-500 dark:from-sky-400 dark:to-cyan-200">
                 {totalConducted > 0 ? `${overallPct.toFixed(1)}%` : "0%"}
               </span>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-sky-300">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-sky-700 dark:text-sky-300">
                 Current Turnout
               </span>
             </div>
@@ -459,15 +468,15 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
             <div
               className={`mt-4 flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
                 totalConducted === 0
-                  ? "bg-slate-800 text-slate-300 border border-white/10"
+                  ? "bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-white/10"
                   : isEligible
-                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                  : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20"
+                  : "bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20"
               }`}
             >
               {totalConducted === 0 ? (
                 <>
-                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  <Clock className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
                   <span>No Classes Conducted (0%)</span>
                 </>
               ) : isEligible ? (
@@ -483,7 +492,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               )}
             </div>
 
-            <div className="mt-2 text-[11px] text-slate-400 font-mono">
+            <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 font-mono">
               {totalConducted > 0
                 ? `${totalAttended} attended of ${totalConducted} classes`
                 : "0 classes conducted yet"}
@@ -494,60 +503,60 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           <div
             id="id-card"
             onClick={() => setIsIdModalOpen(true)}
-            className="p-6 rounded-3xl glass-card border border-white/15 bg-gradient-to-br from-slate-900/90 to-sky-950/80 shadow-[0_0_30px_rgba(56,189,248,0.15)] flex flex-col justify-between cursor-pointer hover:border-sky-400/50 transition-all group pointer-events-auto"
+            className="p-6 rounded-3xl glass-card border border-slate-200/80 dark:border-white/15 bg-gradient-to-br from-white via-sky-50/40 to-slate-50 dark:from-slate-900/90 dark:to-sky-950/80 shadow-[0_4px_25px_rgba(56,189,248,0.1)] dark:shadow-[0_0_30px_rgba(56,189,248,0.15)] flex flex-col justify-between cursor-pointer hover:border-sky-400/50 transition-all group pointer-events-auto"
           >
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[10px] uppercase tracking-widest text-sky-400 font-bold">
+                <span className="text-[10px] uppercase tracking-widest text-sky-600 dark:text-sky-400 font-bold">
                   Digital Campus ID
                 </span>
-                <h3 className="text-lg font-bold text-white mt-1 group-hover:text-sky-300 transition-colors">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1 group-hover:text-sky-600 dark:group-hover:text-sky-300 transition-colors">
                   {currentUser?.name || "Academic Scholar"}
                 </h3>
-                <p className="text-xs text-slate-400 font-mono">
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                   ID: {roll}
                 </p>
               </div>
-              <div className="p-2 rounded-xl bg-white/10 border border-white/20 text-white group-hover:bg-sky-500/20 transition-all">
-                <QrCode className="w-6 h-6 text-sky-300" />
+              <div className="p-2 rounded-xl bg-sky-100/70 border border-sky-200 text-sky-700 dark:bg-white/10 dark:border-white/20 dark:text-white group-hover:bg-sky-200 dark:group-hover:bg-sky-500/20 transition-all">
+                <QrCode className="w-6 h-6 text-sky-600 dark:text-sky-300" />
               </div>
             </div>
 
             {/* If soft copy is uploaded, preview it */}
             {currentUser?.idCardSoftCopy ? (
-              <div className="my-2 p-1 rounded-xl bg-slate-950 border border-sky-400/30 overflow-hidden h-20 relative">
+              <div className="my-2 p-1 rounded-xl bg-slate-100 dark:bg-slate-950 border border-sky-400/30 overflow-hidden h-20 relative">
                 <img
                   src={currentUser.idCardSoftCopy}
                   alt="Campus ID Soft Copy"
                   className="w-full h-full object-cover rounded-lg"
                 />
-                <span className="absolute bottom-1 right-2 bg-slate-900/90 px-2 py-0.5 rounded text-[9px] font-bold text-sky-300">
+                <span className="absolute bottom-1 right-2 bg-white/90 dark:bg-slate-900/90 px-2 py-0.5 rounded text-[9px] font-bold text-sky-700 dark:text-sky-300">
                   Soft Copy Verified
                 </span>
               </div>
             ) : (
-              <div className="my-3 py-2 border-y border-white/10 flex justify-between text-xs text-slate-300">
+              <div className="my-3 py-2 border-y border-slate-200 dark:border-white/10 flex justify-between text-xs text-slate-700 dark:text-slate-300">
                 <div>
                   <span className="text-[10px] text-slate-500 block">Department</span>
-                  <span className="truncate max-w-[100px] block">{currentUser?.department || "General"}</span>
+                  <span className="truncate max-w-[100px] block font-medium">{currentUser?.department || "General"}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Semester</span>
-                  <span>Sem {currentUser?.semester || 1}</span>
+                  <span className="font-medium">Sem {currentUser?.semester || 1}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-500 block">Section</span>
-                  <span>{currentUser?.section || "Section A"}</span>
+                  <span className="font-medium">{currentUser?.section || "Section A"}</span>
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between text-xs text-emerald-400">
-              <div className="flex items-center gap-1.5">
-                <span className={`w-2 h-2 rounded-full ${geoStatus.insideCampus ? "bg-emerald-400 animate-ping" : "bg-amber-400"}`} />
+            <div className="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-1.5 font-medium">
+                <span className={`w-2 h-2 rounded-full ${geoStatus.insideCampus ? "bg-emerald-500 animate-ping" : "bg-amber-500"}`} />
                 <span>{geoStatus.statusText}</span>
               </div>
-              <span className="text-[11px] text-sky-400 group-hover:underline flex items-center gap-1">
+              <span className="text-[11px] text-sky-600 dark:text-sky-400 group-hover:underline flex items-center gap-1 font-semibold">
                 <span>View Full ID</span>
                 <ExternalLink className="w-3 h-3" />
               </span>
@@ -555,26 +564,26 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           </div>
 
           {/* Safe Margin Calculator & Session Info */}
-          <div id="calculator" className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
+          <div id="calculator" className="p-6 rounded-3xl glass-card border border-slate-200/80 dark:border-white/10 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <TrendingUp className="w-5 h-5 text-sky-400" />
-                <h3 className="text-base font-bold text-white">Bunk & Session Ledger</h3>
+                <TrendingUp className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Bunk & Session Ledger</h3>
               </div>
-              <p className="text-xs text-slate-400 mb-4">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
                 Real-time safety calculations based on 75% institutional threshold:
               </p>
 
               <div className="space-y-2.5 text-xs">
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex justify-between items-center">
-                  <span className="text-slate-300">Safe Permissible Bunks:</span>
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/5 flex justify-between items-center">
+                  <span className="text-slate-700 dark:text-slate-300">Safe Permissible Bunks:</span>
                   <span
                     className={`font-bold ${
                       totalConducted === 0
-                        ? "text-slate-400"
+                        ? "text-slate-500 dark:text-slate-400"
                         : allowedAbsences > 0
-                        ? "text-emerald-400"
-                        : "text-rose-400"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-rose-600 dark:text-rose-400"
                     }`}
                   >
                     {totalConducted === 0
@@ -586,42 +595,42 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                 </div>
 
                 {totalConducted > 0 && !isEligible && (
-                  <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/20 flex justify-between items-center text-rose-300">
+                  <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-500/20 flex justify-between items-center text-rose-700 dark:text-rose-300">
                     <span>Classes Needed to Reach 75%:</span>
-                    <span className="font-bold text-rose-400">
+                    <span className="font-bold text-rose-600 dark:text-rose-400">
                       {classesNeededToRecover} Consecutive Classes
                     </span>
                   </div>
                 )}
 
-                <div className="p-2.5 rounded-xl bg-slate-900/60 border border-white/5 flex justify-between items-center">
-                  <span className="text-slate-300">Batch / Course Duration:</span>
-                  <span className="font-bold text-sky-300">
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/5 flex justify-between items-center">
+                  <span className="text-slate-700 dark:text-slate-300">Batch / Course Duration:</span>
+                  <span className="font-bold text-sky-700 dark:text-sky-300">
                     {currentUser?.batchDuration || currentUser?.sessionYear || "Batch Unset"} (Sem {currentUser?.semester || 1})
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-slate-400 flex items-center justify-between">
-              <span>Archived Semesters: <strong>{currentUser?.archivedSessions?.length || 0}</strong></span>
-              <span className="text-sky-300 font-medium">Auto-Archive on Upgrade</span>
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-white/10 text-[11px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
+              <span>Archived Semesters: <strong className="text-slate-800 dark:text-white">{currentUser?.archivedSessions?.length || 0}</strong></span>
+              <span className="text-sky-600 dark:text-sky-300 font-medium">Auto-Archive on Upgrade</span>
             </div>
           </div>
         </div>
 
         {/* Today's Lecture Schedule (Student View) */}
-        <div id="schedule" className="p-6 rounded-3xl glass-card border border-white/10">
+        <div id="schedule" className="p-6 rounded-3xl glass-card border border-slate-200/80 dark:border-white/10">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-white mb-1">Today&apos;s Lecture Schedule</h3>
-              <p className="text-xs text-slate-400">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Today&apos;s Lecture Schedule</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
                 Timetable for {currentUser?.department || "Department"} &bull; Sem {currentUser?.semester || 1} ({currentUser?.section || "Section A"})
               </p>
             </div>
             <button
               onClick={fetchAnalytics}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-sky-600 dark:text-sky-400 transition-all cursor-pointer"
               title="Refresh Schedule"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -630,12 +639,12 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
 
           {!todayRoutines || todayRoutines.length === 0 ? (
             /* STRICT EMPTY STATE: Rest Day 🌴 - No classes scheduled for today. */
-            <div className="py-10 px-4 text-center rounded-2xl bg-slate-950/40 border border-white/5 flex flex-col items-center justify-center">
+            <div className="py-10 px-4 text-center rounded-2xl bg-slate-50 border border-slate-200/80 dark:bg-slate-950/40 dark:border-white/5 flex flex-col items-center justify-center">
               <span className="text-3xl mb-2">🌴</span>
-              <h4 className="text-base font-bold text-white mb-1">
+              <h4 className="text-base font-bold text-slate-900 dark:text-white mb-1">
                 Rest Day 🌴 - No classes scheduled for today.
               </h4>
-              <p className="text-xs text-slate-400 max-w-md">
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md">
                 No lectures are scheduled for your cohort today in the institutional timetable. Enjoy your rest day!
               </p>
             </div>
@@ -644,16 +653,16 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               {todayRoutines.map((r, i) => (
                 <div
                   key={r._id || i}
-                  className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 flex flex-col justify-between"
+                  className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 dark:bg-slate-900/60 dark:border-white/5 flex flex-col justify-between"
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="font-mono text-xs font-bold text-sky-400 px-2 py-0.5 rounded bg-sky-950/80 border border-sky-800">
+                      <span className="font-mono text-xs font-bold text-sky-700 dark:text-sky-400 px-2 py-0.5 rounded bg-sky-100 dark:bg-sky-950/80 border border-sky-200 dark:border-sky-800">
                         {r.timeSlot}
                       </span>
                     </div>
-                    <h5 className="font-bold text-white text-sm mt-1">{r.subject}</h5>
-                    <p className="text-xs text-slate-400 mt-0.5">Faculty: {r.teacherName || "Assigned Faculty"}</p>
+                    <h5 className="font-bold text-slate-900 dark:text-white text-sm mt-1">{r.subject}</h5>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Faculty: {r.teacherName || "Assigned Faculty"}</p>
                   </div>
                 </div>
               ))}
@@ -662,15 +671,15 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
         </div>
 
         {/* Live Subject-Wise Ledger */}
-        <div id="subjects" className="p-6 rounded-3xl glass-card border border-white/10">
+        <div id="subjects" className="p-6 rounded-3xl glass-card border border-slate-200/80 dark:border-white/10">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-bold text-white mb-1">Subject-Wise Attendance Ledger</h3>
-              <p className="text-xs text-slate-400">Detailed lecture logs connected live to MongoDB records</p>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">Subject-Wise Attendance Ledger</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Detailed lecture logs connected live to MongoDB records</p>
             </div>
             <button
               onClick={fetchAnalytics}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-sky-600 dark:text-sky-400 transition-all cursor-pointer"
               title="Refresh Ledger"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
@@ -678,7 +687,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           </div>
 
           {subjects.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-xs">
+            <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-xs">
               No class attendance logged yet for your semester. Mark your attendance during upcoming lectures.
             </div>
           ) : (
@@ -686,33 +695,33 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
               {subjects.map((sub, index) => (
                 <div
                   key={index}
-                  className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 flex flex-col justify-between"
+                  className="p-4 rounded-2xl bg-white dark:bg-slate-900/60 border border-slate-200/80 dark:border-white/5 shadow-sm dark:shadow-none flex flex-col justify-between"
                 >
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <span className="font-mono text-xs text-sky-400 font-bold">{sub.code}</span>
-                      <div className="font-semibold text-sm text-white mt-0.5">{sub.name}</div>
+                      <span className="font-mono text-xs text-sky-600 dark:text-sky-400 font-bold">{sub.code}</span>
+                      <div className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">{sub.name}</div>
                     </div>
                     <span
                       className={`text-xs font-bold px-2 py-0.5 rounded-md ${
                         sub.total === 0
-                          ? "text-slate-400 bg-slate-800/80 border border-white/10"
+                          ? "text-slate-500 bg-slate-100 border border-slate-200 dark:text-slate-400 dark:bg-slate-800/80 dark:border-white/10"
                           : sub.percent >= 85
-                          ? "text-emerald-400 bg-emerald-950/60 border border-emerald-500/30"
+                          ? "text-emerald-700 bg-emerald-50 border border-emerald-200 dark:text-emerald-400 dark:bg-emerald-950/60 dark:border-emerald-500/30"
                           : sub.percent >= 75
-                          ? "text-sky-400 bg-sky-950/60 border border-sky-500/30"
-                          : "text-rose-400 bg-rose-950/60 border border-rose-500/30"
+                          ? "text-sky-700 bg-sky-50 border border-sky-200 dark:text-sky-400 dark:bg-sky-950/60 dark:border-sky-500/30"
+                          : "text-rose-700 bg-rose-50 border border-rose-200 dark:text-rose-400 dark:bg-rose-950/60 dark:border-rose-500/30"
                       }`}
                     >
                       {sub.total === 0 ? "0.0% (No Sessions)" : `${sub.percent.toFixed(1)}%`}
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-800 rounded-full h-2 my-2 overflow-hidden">
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 my-2 overflow-hidden">
                     <div
                       className={`h-2 rounded-full ${
                         sub.total === 0
-                          ? "bg-slate-700"
+                          ? "bg-slate-300 dark:bg-slate-700"
                           : sub.percent >= 85
                           ? "bg-gradient-to-r from-sky-500 to-emerald-400"
                           : sub.percent >= 75
@@ -723,7 +732,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                     />
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-slate-400 mt-1">
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
                     <span>{sub.attended} Attended of {sub.total} Classes</span>
                     <span>{Math.max(0, sub.total - sub.attended)} Missed</span>
                   </div>
@@ -736,10 +745,10 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
         {/* Real Campus Circulars & Registered Leaves Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Institutional Circulars */}
-          <div className="p-6 rounded-3xl glass-card border border-white/10">
+          <div className="p-6 rounded-3xl glass-card border border-slate-200/80 dark:border-white/10">
             <div className="flex items-center gap-2 mb-4">
-              <Megaphone className="w-5 h-5 text-sky-400" />
-              <h3 className="text-lg font-bold text-white">Campus Circulars & Directives</h3>
+              <Megaphone className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Campus Circulars & Directives</h3>
             </div>
 
             <div className="space-y-3">
@@ -749,25 +758,25 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                     key={circ._id}
                     className={`p-4 rounded-2xl border ${
                       circ.important
-                        ? "bg-rose-950/30 border-rose-500/30"
-                        : "bg-slate-900/60 border-white/5"
+                        ? "bg-rose-50/80 border-rose-200 dark:bg-rose-950/30 dark:border-rose-500/30"
+                        : "bg-slate-50 border-slate-200/80 dark:bg-slate-900/60 dark:border-white/5"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-bold text-white">{circ.title}</span>
-                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-sky-950/80 text-sky-300 border border-sky-800">
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">{circ.title}</span>
+                      <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-sky-100 text-sky-700 border border-sky-200 dark:bg-sky-950/80 dark:text-sky-300 dark:border-sky-800">
                         {circ.category}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 leading-relaxed">{circ.content}</p>
-                    <div className="mt-2 text-[10px] text-slate-400 flex items-center justify-between">
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{circ.content}</p>
+                    <div className="mt-2 text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between">
                       <span>Posted by {circ.authorName} ({circ.authorRole})</span>
                       <span>{new Date(circ.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-xs text-slate-400 text-center">
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 dark:bg-slate-900/60 dark:border-white/5 text-xs text-slate-500 dark:text-slate-400 text-center">
                   No active circulars posted. Institutional directives will appear here live.
                 </div>
               )}
@@ -775,16 +784,16 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
           </div>
 
           {/* Registered Leaves Status */}
-          <div id="leave" className="p-6 rounded-3xl glass-card border border-white/10 flex flex-col justify-between">
+          <div id="leave" className="p-6 rounded-3xl glass-card border border-slate-200/80 dark:border-white/10 flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-sky-400" />
-                  <h3 className="text-lg font-bold text-white">My Leave Applications</h3>
+                  <FileText className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">My Leave Applications</h3>
                 </div>
                 <button
                   onClick={() => setIsLeaveModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-600/30 hover:bg-sky-600/50 text-sky-300 border border-sky-500/30 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-100 hover:bg-sky-200 text-sky-800 border border-sky-300 dark:bg-sky-600/30 dark:hover:bg-sky-600/50 dark:text-sky-300 dark:border-sky-500/30 cursor-pointer"
                 >
                   + Apply
                 </button>
@@ -795,42 +804,42 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
                   leaves.map((lv) => (
                     <div
                       key={lv._id}
-                      className="p-3.5 rounded-2xl bg-slate-900/60 border border-white/5 flex items-center justify-between"
+                      className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 dark:bg-slate-900/60 dark:border-white/5 flex items-center justify-between"
                     >
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white">{lv.leaveType}</span>
+                          <span className="text-xs font-bold text-slate-900 dark:text-white">{lv.leaveType}</span>
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                               lv.status === "Approved"
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                                ? "bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/20 dark:text-emerald-300 dark:border-emerald-500/30"
                                 : lv.status === "Rejected"
-                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                                : "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                                ? "bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/20 dark:text-rose-300 dark:border-rose-500/30"
+                                : "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/20 dark:text-amber-300 dark:border-amber-500/30"
                             }`}
                           >
                             {lv.status}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-400 mt-1">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
                           {new Date(lv.startDate).toLocaleDateString()} &rarr; {new Date(lv.endDate).toLocaleDateString()}
                         </div>
                       </div>
-                      <div className="text-right text-[11px] text-slate-400 max-w-[140px] truncate">
+                      <div className="text-right text-[11px] text-slate-500 dark:text-slate-400 max-w-[140px] truncate">
                         {lv.reason}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="p-4 rounded-2xl bg-slate-900/60 border border-white/5 text-xs text-slate-400 text-center">
+                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 dark:bg-slate-900/60 dark:border-white/5 text-xs text-slate-500 dark:text-slate-400 text-center">
                     No leave requests on record. Use the Apply button above to register duty or medical absences.
                   </div>
                 )}
               </div>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-white/10 text-[11px] text-slate-400">
-              Sanctioning Authority: <span className="text-sky-300 font-medium">Head of Department (HOD)</span>
+            <div className="mt-4 pt-3 border-t border-slate-200 dark:border-white/10 text-[11px] text-slate-500 dark:text-slate-400">
+              Sanctioning Authority: <span className="text-sky-700 dark:text-sky-300 font-medium">Head of Department (HOD)</span>
             </div>
           </div>
         </div>

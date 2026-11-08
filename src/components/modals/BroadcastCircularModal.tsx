@@ -102,21 +102,21 @@ export function BroadcastCircularModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="relative z-50 w-full max-w-lg bg-slate-900 border border-purple-500/30 rounded-3xl p-6 shadow-[0_0_50px_rgba(168,85,247,0.25)] text-white overflow-hidden pointer-events-auto my-auto"
+            className="relative z-50 w-full max-w-lg bg-white border border-slate-200 dark:bg-slate-900 dark:border-purple-500/30 rounded-3xl p-6 shadow-2xl text-slate-900 dark:text-white overflow-hidden pointer-events-auto my-auto"
           >
             {/* Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-5">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10 mb-5">
               <div className="flex items-center gap-2">
-                <Megaphone className="w-5 h-5 text-purple-400" />
+                <Megaphone className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                 <div>
-                  <h2 className="text-lg font-bold text-white">Broadcast Campus Circular</h2>
-                  <p className="text-[11px] text-slate-400">Published via {authorRole} ({department})</p>
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-white">Broadcast Campus Circular</h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Published via {authorRole} ({department})</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
+                className="p-2 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-900/40 dark:text-slate-400 dark:hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" />
@@ -124,14 +124,14 @@ export function BroadcastCircularModal({
             </div>
 
             {errorMessage && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 dark:bg-rose-500/10 dark:border-rose-500/30 dark:text-rose-400 text-xs flex items-center gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 <span>{errorMessage}</span>
               </div>
             )}
 
             {successMessage && (
-              <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:text-emerald-400 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
                 <span>{successMessage}</span>
               </div>
@@ -140,7 +140,7 @@ export function BroadcastCircularModal({
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               {/* Title */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   Circular Headline / Notice Title
                 </label>
                 <input
@@ -149,20 +149,20 @@ export function BroadcastCircularModal({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g., Mandatory End-Semester Biometric Audit Notice"
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-purple-400 text-xs"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-purple-500 dark:bg-slate-950 dark:border-white/10 dark:text-white dark:focus:border-purple-400 text-xs shadow-sm"
                 />
               </div>
 
               {/* Category & Audience */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                     Notice Category
                   </label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-purple-400 text-xs cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-purple-500 dark:bg-slate-950 dark:border-white/10 dark:text-white dark:focus:border-purple-400 text-xs cursor-pointer shadow-sm"
                   >
                     <option value="General">General Administrative</option>
                     <option value="Academic">Academic Schedule</option>
@@ -172,13 +172,13 @@ export function BroadcastCircularModal({
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
+                  <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                     Target Cohort
                   </label>
                   <select
                     value={targetAudience}
                     onChange={(e) => setTargetAudience(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-purple-400 text-xs cursor-pointer"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-purple-500 dark:bg-slate-950 dark:border-white/10 dark:text-white dark:focus:border-purple-400 text-xs cursor-pointer shadow-sm"
                   >
                     <option value="All">All College Scholars & Staff</option>
                     <option value="Students">Scholars & Students Only</option>
@@ -190,7 +190,7 @@ export function BroadcastCircularModal({
 
               {/* Content Body */}
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-700 dark:text-slate-300 font-semibold mb-1">
                   Full Mandate Body
                 </label>
                 <textarea
@@ -199,17 +199,17 @@ export function BroadcastCircularModal({
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="Type the official institution circular content..."
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-purple-400 text-xs resize-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-900 focus:outline-none focus:border-purple-500 dark:bg-slate-950 dark:border-white/10 dark:text-white dark:focus:border-purple-400 text-xs resize-none shadow-sm"
                 />
               </div>
 
               {/* High Priority Checkbox */}
-              <div className="p-3 rounded-xl bg-slate-950 border border-white/5 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 dark:bg-slate-950 dark:border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <BellRing className="w-4 h-4 text-purple-400" />
+                  <BellRing className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                   <div>
-                    <span className="font-semibold text-white block">Mark as Critical Advisory</span>
-                    <span className="text-[11px] text-slate-400">Pushes red alert banner to recipient dashboards</span>
+                    <span className="font-semibold text-slate-900 dark:text-white block">Mark as Critical Advisory</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">Pushes red alert banner to recipient dashboards</span>
                   </div>
                 </div>
                 <input
@@ -225,7 +225,7 @@ export function BroadcastCircularModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer pointer-events-auto"
+                  className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition-all cursor-pointer pointer-events-auto"
                 >
                   Cancel
                 </button>

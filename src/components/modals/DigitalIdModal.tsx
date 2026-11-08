@@ -71,19 +71,19 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="relative z-50 w-full max-w-md bg-slate-900 border border-sky-500/30 rounded-3xl p-6 shadow-[0_0_50px_rgba(56,189,248,0.2)] text-white overflow-hidden pointer-events-auto my-auto"
+            className="relative z-50 w-full max-w-md bg-white border border-slate-200 dark:bg-slate-900 dark:border-sky-500/30 rounded-3xl p-6 shadow-2xl text-slate-900 dark:text-white overflow-hidden pointer-events-auto my-auto"
           >
             {/* Header controls */}
-            <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200 dark:border-white/10 mb-4">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-sky-400" />
-                <h2 className="text-base font-bold text-white">Digital Campus Credential</h2>
+                <Sparkles className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Digital Campus Credential</h2>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setIsFlipped(!isFlipped)}
-                  className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 hover:text-sky-300 transition-all text-xs flex items-center gap-1.5 cursor-pointer pointer-events-auto border border-sky-500/20"
+                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-sky-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-sky-400 transition-all text-xs flex items-center gap-1.5 cursor-pointer pointer-events-auto border border-slate-300 dark:border-sky-500/20"
                   title="Flip Card"
                 >
                   <RotateCw className="w-3.5 h-3.5" />
@@ -92,7 +92,7 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
+                  className="p-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-500 hover:text-rose-700 dark:bg-slate-800 dark:hover:bg-rose-900/40 dark:text-slate-400 dark:hover:text-rose-400 transition-all cursor-pointer pointer-events-auto"
                   aria-label="Close"
                 >
                   <X className="w-4 h-4" />
