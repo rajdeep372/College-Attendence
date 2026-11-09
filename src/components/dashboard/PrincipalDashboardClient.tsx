@@ -379,15 +379,15 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
             </div>
 
             {/* Department Selection Dropdown */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center w-full sm:w-auto gap-2 max-w-full min-w-0">
               <label className="text-xs font-semibold text-slate-300 shrink-0">Command Dept:</label>
               <select
                 value={operatingAsDept}
                 onChange={(e) => setOperatingAsDept(e.target.value)}
-                className="px-4 py-2.5 rounded-xl bg-slate-900/90 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-lg"
+                className="w-full max-w-full sm:w-auto sm:max-w-xs md:max-w-sm truncate text-ellipsis overflow-hidden px-4 py-2.5 rounded-xl bg-slate-900/90 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-lg"
               >
                 {departmentsOverview.map((dept) => (
-                  <option key={dept.name} value={dept.name} className="bg-slate-900 text-white">
+                  <option key={dept.name} value={dept.name} className="bg-slate-900 text-white truncate">
                     {dept.name}
                   </option>
                 ))}
@@ -404,10 +404,10 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
             </div>
             <button
               onClick={() => handleExportAuditSheet(operatingAsDept)}
-              className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/30 flex items-center gap-1.5 shrink-0 transition-all cursor-pointer"
+              className="w-full sm:w-auto px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-semibold border border-amber-500/30 flex items-center justify-center gap-1.5 shrink-0 transition-all cursor-pointer text-xs"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export {operatingAsDept} Sheet (.xlsx)</span>
+              <Download className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate max-w-[240px] sm:max-w-xs">Export {operatingAsDept} (.xlsx)</span>
             </button>
           </div>
 
@@ -520,12 +520,12 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
             
             <div className="flex flex-wrap items-center gap-3 text-xs">
               {/* Department Dropdown Filter */}
-              <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-2 rounded-xl border border-white/10">
+              <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-2 rounded-xl border border-white/10 w-full sm:w-auto max-w-full min-w-0">
                 <Filter className="w-3.5 h-3.5 text-purple-400 shrink-0" />
                 <select
                   value={selectedRosterDept}
                   onChange={(e) => setSelectedRosterDept(e.target.value)}
-                  className="bg-transparent text-white focus:outline-none cursor-pointer text-xs"
+                  className="bg-transparent text-white focus:outline-none cursor-pointer text-xs w-full max-w-full sm:max-w-xs truncate text-ellipsis overflow-hidden"
                 >
                   <option value="All" className="bg-slate-900">All Units ({departmentsOverview.length})</option>
                   {departmentsOverview.map((d) => (
