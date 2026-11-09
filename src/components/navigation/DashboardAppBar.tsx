@@ -504,7 +504,7 @@ export function DashboardAppBar() {
                 <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex items-center justify-between">
                   <span className="text-slate-400 font-medium">Active Geofence Status</span>
                   <span className="px-2.5 py-1 rounded-full font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono">
-                    {auditData?.geofenceStatus || "Operational (≤50m)"}
+                    {auditData?.geofenceStatus || "Operational (≤150m)"}
                   </span>
                 </div>
 

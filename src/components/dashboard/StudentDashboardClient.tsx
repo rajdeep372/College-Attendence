@@ -202,7 +202,7 @@ export function StudentDashboardClient({ user }: { user: SerializedUser | null }
             COLLEGE_COORDINATES.latitude,
             COLLEGE_COORDINATES.longitude
           );
-          const isInside = dist <= (COLLEGE_COORDINATES.allowedRadiusMeters || 100);
+          const isInside = dist <= (COLLEGE_COORDINATES.allowedRadiusMeters || 150);
           setGeoStatus({
             insideCampus: isInside,
             distanceMeters: Math.round(dist),

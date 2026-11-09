@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Aggressive Backend Geofencing (Haversine Distance <= 50m)
+    // 3. Strict Campus-Wide Geofencing (RCCIIT Beliaghata <= 150m)
     const distanceMeters = calculateHaversineDistance(
       latitude,
       longitude,
@@ -60,13 +60,13 @@ export async function POST(req: NextRequest) {
       COLLEGE_COORDINATES.longitude
     );
 
-    const maxAllowedMeters = COLLEGE_COORDINATES.allowedRadiusMeters || 50;
+    const maxAllowedMeters = COLLEGE_COORDINATES.allowedRadiusMeters || 150;
 
     if (distanceMeters > maxAllowedMeters) {
       return NextResponse.json(
         {
           success: false,
-          error: `Geofence violation: You are ${distanceMeters} meters away from ${COLLEGE_COORDINATES.name}. You must be physically present within ${maxAllowedMeters}m radius of campus coordinates [${COLLEGE_COORDINATES.latitude}, ${COLLEGE_COORDINATES.longitude}] to check in.`,
+          error: `Geofence Violation: You are ${distanceMeters} meters away. You must be inside the RCCIIT campus perimeter to enter the PIN.`,
           distanceMeters,
           maxAllowedMeters,
           isWithinGeofence: false,

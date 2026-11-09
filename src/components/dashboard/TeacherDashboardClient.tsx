@@ -225,7 +225,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                 Classroom Attendance & Dynamic Anti-Proxy QR
               </h1>
               <p className="mt-1 text-sm text-slate-300 max-w-2xl">
-                Broadcast rolling context-aware 4-digit PINs tied strictly to live timetable classes. Enforces strict 50m campus geofence to eliminate proxy attendance.
+                Broadcast rolling context-aware 4-digit PINs tied strictly to live timetable classes. Enforces strict 150m RCCIIT campus geofence to eliminate proxy attendance.
               </p>
             </div>
 
@@ -344,9 +344,9 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                   <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-white/10 flex items-center gap-3 text-xs text-slate-300">
                     <MapPin className="w-4 h-4 text-sky-400 shrink-0" />
                     <div>
-                      <span className="font-bold text-white block">Strict 50-Meter Geofence Enforced</span>
+                      <span className="font-bold text-white block">Strict 150-Meter Campus Geofence Enforced</span>
                       <span className="text-[11px] text-slate-400">
-                        Students must submit coordinates within 50m of college premises to check in.
+                        Students must submit coordinates within 150m of RCCIIT Beliaghata campus to check in.
                       </span>
                     </div>
                   </div>

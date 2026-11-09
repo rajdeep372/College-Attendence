@@ -4,13 +4,16 @@ import crypto from "crypto";
 const TOTP_SECRET = process.env.TOTP_SECRET || "ACADEMIA_SYNC_COLLEGE_SECRET_GEOFENCE_KEY";
 const STEP_SECONDS = 60; // 60 seconds rolling window
 
-// Fixed College Coordinate (Lecture Hall CS-301 / Campus Center)
+// Master RCCIIT Beliaghata Campus Coordinates (Canal South Road, Beliaghata, Kolkata 700015)
 export const COLLEGE_COORDINATES = {
-  latitude: 22.5726,
-  longitude: 88.3639,
-  name: "Main Campus & Lecture Hall CS-301",
-  allowedRadiusMeters: 50,
+  latitude: 22.5626,
+  longitude: 88.3980,
+  name: "RCCIIT Beliaghata Campus",
+  address: "Canal South Road, Beliaghata, Kolkata, West Bengal 700015, India",
+  allowedRadiusMeters: 150,
 };
+
+export const RCCIIT_CAMPUS_COORDINATES = COLLEGE_COORDINATES;
 
 /**
  * Calculates Haversine distance between two coordinates in meters

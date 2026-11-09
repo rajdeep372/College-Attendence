@@ -15,6 +15,7 @@ import {
   Navigation,
   Crosshair
 } from "lucide-react";
+import { COLLEGE_COORDINATES, calculateHaversineDistance } from "@/lib/totp";
 
 interface GeolocationCoords {
   latitude: number;
@@ -33,11 +34,8 @@ interface MarkAttendanceResult {
   timestamp?: string;
 }
 
-// Campus center: Lecture Hall CS-301
-const COLLEGE_COORDS = {
-  latitude: 22.5726,
-  longitude: 88.3639,
-};
+// Master RCCIIT Beliaghata Coordinates
+const COLLEGE_COORDS = COLLEGE_COORDINATES;
 
 export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
   const [pin, setPin] = useState<string>("");
@@ -133,7 +131,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
       setIsSubmitting(true);
       const userCoords = await obtainCoordinates();
 
-      setStatusMessage("Validating Geofence (<50m) & TOTP Hash with Campus Server...");
+      setStatusMessage("Validating RCCIIT Geofence (≤150m) & PIN with Campus Server...");
 
       const response = await fetch("/api/attendance/mark", {
         method: "POST",
@@ -186,7 +184,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
             Lecture Hall Self Check-In
           </h3>
           <p className="text-xs text-slate-300 mt-1">
-            Enter the 4-digit dynamic PIN from the projector screen. Your physical proximity is verified within 50 meters.
+            Enter the 4-digit dynamic PIN from the projector screen. Your physical proximity is verified within 150 meters of RCCIIT.
           </p>
         </div>
 
@@ -199,7 +197,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
             </div>
             <div className="text-left">
               <div className="text-[10px] text-slate-400 uppercase font-mono">Geofence Limit</div>
-              <div className="text-xs font-bold text-sky-300 font-mono">50m Radius</div>
+              <div className="text-xs font-bold text-sky-300 font-mono">150m Radius</div>
             </div>
           </div>
         </div>
@@ -210,7 +208,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
         <div className="flex items-center gap-2 text-slate-300">
           <MapPin className="w-4 h-4 text-sky-400 shrink-0" />
           <span>
-            Target: <strong>Lecture Hall CS-301</strong> (22.5726° N, 88.3639° E)
+            Target: <strong>RCCIIT Beliaghata Campus</strong> (22.5626° N, 88.3980° E)
           </span>
         </div>
 
@@ -286,7 +284,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
             <div className="mt-0.5 leading-relaxed">{error}</div>
             {error.includes("Geofence") && (
               <div className="mt-2 text-[11px] text-rose-400 font-mono">
-                Tip: If testing remotely, switch GPS Mode to &quot;Classroom GPS&quot; above to simulate being inside Lecture Hall CS-301.
+                Tip: If testing remotely, switch GPS Mode to &quot;Classroom GPS&quot; above to simulate being inside RCCIIT Beliaghata Campus.
               </div>
             )}
           </div>

@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       attendanceSessionsCount: attendanceLogs.length,
       averageAttendance: turnoutPercentage,
       turnoutText,
-      geofenceStatus: "Operational (≤50m)",
+      geofenceStatus: "Operational (≤150m RCCIIT Campus)",
       timetableSyncText,
     });
   } catch (error: unknown) {
