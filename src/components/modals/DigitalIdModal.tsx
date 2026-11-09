@@ -29,6 +29,10 @@ interface DigitalIdModalProps {
     rollNumber?: string;
     profilePicture?: string;
     clerkId?: string;
+    batchDuration?: string;
+    courseDuration?: string;
+    idCardSoftCopy?: string;
+    idCardImage?: string;
   } | null;
 }
 
@@ -146,12 +150,14 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                       <div className="text-[11px] text-slate-300 truncate mt-1">
                         {dept}
                       </div>
-                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-300">
+                      <div className="flex items-center gap-1.5 mt-1 text-[10px] text-slate-300 flex-wrap">
                         <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
                           {user?.section || "Section A"}
                         </span>
                         <span>&bull; Sem {user?.semester || 1}</span>
-                        <span className="text-slate-400">({user?.academicYear || "1st Year"})</span>
+                        <span className="text-emerald-400 font-semibold">
+                          &bull; Batch {user?.batchDuration || user?.courseDuration || user?.academicYear || "2024-2028"}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -188,7 +194,7 @@ export function DigitalIdModal({ isOpen, onClose, user }: DigitalIdModalProps) {
                       </div>
                     </div>
                     <div className="text-right text-[10px] text-slate-400 font-mono">
-                      VALID: 2024 - 2028
+                      VALID: {user?.batchDuration || user?.courseDuration || "2024 - 2028"}
                     </div>
                   </div>
                 </div>

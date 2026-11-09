@@ -12,7 +12,8 @@ import {
   Clock, 
   CheckCircle2, 
   XCircle,
-  QrCode
+  QrCode,
+  IdCard
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -85,6 +86,21 @@ export default async function VerifyStudentPage({ params }: VerifyPageProps) {
   const attendancePercentage = total > 0 ? parseFloat(((attended / total) * 100).toFixed(1)) : 0.0;
   const isEligible = total > 0 ? attendancePercentage >= 75.0 : false;
 
+  // 1. Fetch dynamic batch or courseDuration (replace static 2024-2025)
+  const batchOrCourseDuration =
+    (student as any).batchDuration ||
+    (student as any).courseDuration ||
+    (student as any).batch ||
+    (student as any).sessionYear ||
+    "2023-2027";
+
+  // 2. Fetch uploaded college ID card image URL / soft copy
+  const idCardImageUrl =
+    (student as any).idCardSoftCopy ||
+    (student as any).idCardImage ||
+    (student as any).idCardUrl ||
+    null;
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 sm:p-6">
       <div className="relative max-w-lg w-full rounded-3xl bg-slate-900/95 border border-emerald-500/40 p-6 sm:p-8 text-white shadow-[0_0_60px_rgba(16,185,129,0.2)] overflow-hidden">
@@ -138,8 +154,15 @@ export default async function VerifyStudentPage({ params }: VerifyPageProps) {
             <div className="text-xs text-slate-300 mt-1">
               {student.department || "Computer Science & Engineering"}
             </div>
-            <div className="text-[11px] text-slate-400 mt-0.5">
-              Semester {student.semester || 1} &bull; Section {student.section || "A"} &bull; {student.sessionYear || "2024-2025"}
+            {/* Dynamic Semester, Section, and Batch */}
+            <div className="text-[11px] text-slate-300 mt-1 flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
+              <span>Semester {student.semester || 1}</span>
+              <span className="text-slate-500">&bull;</span>
+              <span>Section {student.section || "A"}</span>
+              <span className="text-slate-500">&bull;</span>
+              <span className="font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                Batch {batchOrCourseDuration}
+              </span>
             </div>
           </div>
         </div>
@@ -187,6 +210,45 @@ export default async function VerifyStudentPage({ params }: VerifyPageProps) {
           </div>
         </div>
 
+        {/* Dedicated Scanned Physical College ID Card Section */}
+        <div className="mb-6 p-4 rounded-2xl bg-slate-950/80 border border-white/10 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <IdCard className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                Uploaded College ID Card (Physical Scan)
+              </h3>
+            </div>
+            {idCardImageUrl && (
+              <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                VERIFIED SCAN
+              </span>
+            )}
+          </div>
+
+          {idCardImageUrl ? (
+            <div className="relative w-full rounded-xl overflow-hidden border border-white/10 shadow-xl bg-slate-900 group">
+              <img
+                src={idCardImageUrl}
+                alt={`${student.name} Official ID Card`}
+                className="w-full max-h-72 object-cover rounded-xl shadow-lg border border-white/10 transition-transform duration-300 hover:scale-[1.01]"
+              />
+              <div className="p-2.5 bg-slate-950/90 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-300 font-mono">
+                <span className="truncate">ROLL: {student.rollNumber || "INST-ID"}</span>
+                <span className="text-emerald-400 font-semibold text-[10px]">DIGITALLY VERIFIED</span>
+              </div>
+            </div>
+          ) : (
+            <div className="p-5 rounded-xl bg-slate-950/50 border border-dashed border-white/10 text-center">
+              <IdCard className="w-7 h-7 text-slate-600 mx-auto mb-2" />
+              <p className="text-xs font-semibold text-slate-300">Scanned College ID Card Not Uploaded</p>
+              <p className="text-[11px] text-slate-500 mt-1">
+                The soft copy scan of the physical student identification card will appear here once uploaded from the student profile.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Digital Verification Ledger Sign-off */}
         <div className="p-3.5 rounded-xl bg-slate-950 border border-white/5 text-[11px] text-slate-400 space-y-1">
           <div className="flex justify-between">
@@ -218,4 +280,3 @@ export default async function VerifyStudentPage({ params }: VerifyPageProps) {
     </div>
   );
 }
-
