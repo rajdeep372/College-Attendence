@@ -17,18 +17,6 @@ export async function POST(req: NextRequest) {
 
 async function handleClassAlerts(req: NextRequest) {
   try {
-    // Security check: optional CRON_SECRET or Vercel Cron header
-    const cronSecret = process.env.CRON_SECRET;
-    const authHeader = req.headers.get("authorization");
-    const isVercelCron = req.headers.get("x-vercel-cron") === "1";
-
-    if (cronSecret && authHeader !== `Bearer ${cronSecret}` && !isVercelCron) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized cron execution." },
-        { status: 401 }
-      );
-    }
-
     await connectToDatabase();
 
     const { currentMinutes, currentDay, formattedTime } = getIstCurrentTime();
