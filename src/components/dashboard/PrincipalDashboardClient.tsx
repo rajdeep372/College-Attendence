@@ -379,12 +379,12 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
             </div>
 
             {/* Department Selection Dropdown */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center w-full sm:w-auto gap-2 max-w-full min-w-0">
+            <div className="flex items-center gap-3 shrink-0">
               <label className="text-xs font-semibold text-slate-300 shrink-0">Command Dept:</label>
               <select
                 value={operatingAsDept}
                 onChange={(e) => setOperatingAsDept(e.target.value)}
-                className="w-full max-w-full sm:w-auto sm:max-w-xs md:max-w-sm truncate text-ellipsis overflow-hidden px-4 py-2.5 rounded-xl bg-slate-900/90 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-lg"
+                className="w-full max-w-[200px] sm:max-w-[250px] md:max-w-[300px] truncate text-ellipsis overflow-hidden whitespace-nowrap px-4 py-2.5 rounded-xl bg-slate-900/90 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-bold focus:outline-none focus:ring-2 focus:ring-amber-500 cursor-pointer shadow-lg"
               >
                 {departmentsOverview.map((dept) => (
                   <option key={dept.name} value={dept.name} className="bg-slate-900 text-white truncate">
