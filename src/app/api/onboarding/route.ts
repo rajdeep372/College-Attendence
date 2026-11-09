@@ -12,6 +12,7 @@ import {
   STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
 import { resolveInstitutionalRole } from "@/lib/server-rbac";
+import { standardizeDepartment } from "@/lib/departments";
 
 export async function GET() {
   try {
@@ -149,14 +150,14 @@ export async function POST(req: NextRequest) {
 
     // Merge pre-filled data from authorizedstaffs whitelist for staff
     let finalName = name && name.trim() ? name.trim() : "";
-    let finalDepartment = department && department.trim() ? department.trim() : "";
+    let finalDepartment = department && department.trim() ? standardizeDepartment(department.trim()) : "";
 
     if (staffDoc) {
       if (staffDoc.name && staffDoc.name.trim()) {
         finalName = staffDoc.name.trim();
       }
       if (staffDoc.department && staffDoc.department.trim()) {
-        finalDepartment = staffDoc.department.trim();
+        finalDepartment = standardizeDepartment(staffDoc.department.trim());
       }
     } else if (isPrincipal) {
       finalName = name?.trim() || "Institutional Principal & Executive Dean";
@@ -169,6 +170,7 @@ export async function POST(req: NextRequest) {
     if (!finalDepartment) {
       finalDepartment = "Computer Science & Engineering (CSE)";
     }
+    finalDepartment = standardizeDepartment(finalDepartment);
 
     if (isStudent && (!rollNumber || !rollNumber.trim())) {
       return NextResponse.json(
@@ -235,11 +237,11 @@ export async function POST(req: NextRequest) {
         publicMetadata: {
           role: assignedRole,
           onboarded: true,
-          department: department.trim(),
+          department: finalDepartment,
           ...(isStudent && cleanRoll ? { rollNumber: cleanRoll } : {}),
         },
       });
-      console.log(`[Clerk Sync] Successfully synced publicMetadata.role='${assignedRole}' for Clerk user ${clerkUser.id}`);
+      console.log(`[Clerk Sync] Successfully synced publicMetadata.role='${assignedRole}' with department='${finalDepartment}' for Clerk user ${clerkUser.id}`);
     } catch (clerkSyncErr) {
       console.warn("[Clerk Sync] Warning: Could not update Clerk publicMetadata:", clerkSyncErr);
     }
@@ -250,7 +252,7 @@ export async function POST(req: NextRequest) {
       try {
         await Routine.updateMany(
           {
-            department: department.trim(),
+            department: finalDepartment,
             "classes.teacherName": new RegExp(`^${trimmedClaim}$`, "i"),
           },
           {

@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import User from "@/models/User";
 import { currentUser } from "@clerk/nextjs/server";
 import { isPrincipalSuperAdmin } from "@/lib/auth-rbac";
+import { standardizeDepartment } from "@/lib/departments";
 
 /**
  * Ensures only verified Principal (Admin) can manage staff whitelist
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    const standardizedDept = standardizeDepartment(department);
 
     await connectToDatabase();
 
@@ -147,7 +149,7 @@ export async function POST(req: NextRequest) {
           email: cleanEmail,
           role: cleanRole,
           name: name.trim(),
-          department: department.trim(),
+          department: standardizedDept,
           updatedAt: now,
         },
         $setOnInsert: {
@@ -157,18 +159,18 @@ export async function POST(req: NextRequest) {
       { upsert: true }
     );
 
-    // Sync role in User collection if user already exists
+    // Sync role & standardized department in User collection if user already exists
     await User.updateOne(
       { email: cleanEmail },
       {
         $set: {
           role: cleanRole,
-          ...(department ? { department: department.trim() } : {}),
+          department: standardizedDept,
         },
       }
     );
 
-    console.log(`[Admin Staff Whitelist] Successfully authorized ${cleanEmail} as '${cleanRole}'`);
+    console.log(`[Admin Staff Whitelist] Successfully authorized ${cleanEmail} as '${cleanRole}' under '${standardizedDept}'`);
 
     return NextResponse.json({
       success: true,
@@ -177,7 +179,7 @@ export async function POST(req: NextRequest) {
         email: cleanEmail,
         role: cleanRole,
         name: name.trim(),
-        department: department.trim(),
+        department: standardizedDept,
       },
     });
   } catch (error: unknown) {

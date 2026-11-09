@@ -4,6 +4,7 @@ import { currentUser, clerkClient } from "@clerk/nextjs/server";
 import { connectToDatabase } from "@/lib/mongodb";
 import User, { IUser, UserRole } from "@/models/User";
 import { determineUserRole } from "@/lib/server-rbac";
+import { standardizeDepartment, getDepartmentVariants } from "@/lib/departments";
 import { 
   validateInstitutionalEmail, 
   deriveDepartment,
@@ -262,5 +263,41 @@ export async function getUserByClerkId(clerkId: string): Promise<SerializedUser 
   } catch (error) {
     console.error("[UserAction: getUserByClerkId] Error:", error);
     return null;
+  }
+}
+
+/**
+ * Fetches teaching faculty roster directly from users MongoDB collection.
+ * Strictly queries:
+ * await User.find({ role: { $in: ['Faculty / Teacher', 'Head of Dept (HOD)'] }, department: selectedDepartment })
+ */
+export async function getDepartmentFacultyRoster(selectedDepartment?: string) {
+  try {
+    await connectToDatabase();
+    const query: Record<string, unknown> = {
+      role: { $in: ["Faculty / Teacher", "Head of Dept (HOD)"] },
+    };
+
+    if (selectedDepartment && selectedDepartment !== "All") {
+      const canonical = standardizeDepartment(selectedDepartment);
+      query.department = { $in: getDepartmentVariants(canonical) };
+    }
+
+    const faculty = await User.find(query)
+      .select("_id name email role department designation profilePicture rollNumber phone")
+      .sort({ name: 1 })
+      .lean();
+
+    const count = await User.countDocuments(query);
+
+    return {
+      success: true,
+      department: selectedDepartment || "All",
+      faculty: JSON.parse(JSON.stringify(faculty)),
+      count,
+    };
+  } catch (error) {
+    console.error("[UserAction: getDepartmentFacultyRoster] Error:", error);
+    return { success: false, department: selectedDepartment || "All", faculty: [], count: 0 };
   }
 }

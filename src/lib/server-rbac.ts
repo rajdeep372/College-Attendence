@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import AuthorizedStaff from "@/models/AuthorizedStaff";
 import { UserRole } from "@/models/User";
 import { isPrincipalSuperAdmin } from "@/lib/auth-rbac";
+import { standardizeDepartment } from "@/lib/departments";
 
 export interface ResolvedRoleInfo {
   role: UserRole;
@@ -102,7 +103,7 @@ export async function resolveInstitutionalRole(email?: string | null): Promise<R
         rawRole: staffDoc.role,
         isWhitelisted: true,
         name: staffDoc.name ? staffDoc.name.trim() : "",
-        department: staffDoc.department ? staffDoc.department.trim() : "",
+        department: staffDoc.department ? standardizeDepartment(staffDoc.department.trim()) : "",
       };
     }
   } catch (err) {

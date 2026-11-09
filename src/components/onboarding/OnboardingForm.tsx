@@ -28,22 +28,9 @@ import {
   isPrincipalSuperAdmin, 
   STRICT_SSO_ERROR_MESSAGE 
 } from "@/lib/auth-rbac";
+import { STANDARD_DEPARTMENTS, standardizeDepartment } from "@/lib/departments";
 
-export const DEPARTMENTS = [
-  "Computer Science & Engineering (CSE)",
-  "Information Technology (IT)",
-  "Artificial Intelligence & Machine Learning (AIML)",
-  "Bachelor of Computer Applications (BCA)",
-  "Master of Computer Applications (MCA)",
-  "Electrical & Electronics Engineering (EEE)",
-  "Electronics & Communication Engineering (ECE)",
-  "Mechanical Engineering (ME)",
-  "Civil Engineering (CE)",
-  "Data Science & Analytics",
-  "Cyber Security & Forensics",
-  "Office of the Principal & Institutional Affairs",
-  "General Academic & Sciences",
-];
+export const DEPARTMENTS = [...STANDARD_DEPARTMENTS];
 
 export const ACADEMIC_YEARS = [
   "1st Year",
@@ -169,7 +156,7 @@ export function OnboardingForm({
             setName(data.name);
           }
           if (data.department) {
-            setDepartment(data.department);
+            setDepartment(standardizeDepartment(data.department));
           }
 
           if (data.assignedRole.toLowerCase().includes("principal") || data.assignedRole.toLowerCase().includes("admin")) {

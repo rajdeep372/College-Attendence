@@ -5,6 +5,7 @@ import User from "@/models/User";
 import { currentUser } from "@clerk/nextjs/server";
 import { isPrincipalSuperAdmin } from "@/lib/auth-rbac";
 import { normalizeStaffRole } from "@/lib/server-rbac";
+import { standardizeDepartment } from "@/lib/departments";
 
 export async function GET() {
   try {
@@ -82,16 +83,28 @@ export async function POST(req: NextRequest) {
     }
 
     const normalizedEmail = email.toLowerCase().trim();
+    const standardizedDept = standardizeDepartment(department);
 
     const staff = await AuthorizedStaff.findOneAndUpdate(
       { email: normalizedEmail },
       {
         email: normalizedEmail,
-        role,
+        role: normalizedRoleInfo.displayRole || role,
         name: name.trim(),
-        department: department.trim(),
+        department: standardizedDept,
       },
       { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    // Sync to User if exists
+    await User.updateOne(
+      { email: normalizedEmail },
+      {
+        $set: {
+          role: normalizedRoleInfo.role,
+          department: standardizedDept,
+        },
+      }
     );
 
     return NextResponse.json({

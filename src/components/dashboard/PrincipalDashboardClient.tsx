@@ -35,6 +35,7 @@ import {
   Filter
 } from "lucide-react";
 import Image from "next/image";
+import { STANDARD_DEPARTMENTS, isSameDepartment } from "@/lib/departments";
 
 interface DepartmentTeacher {
   _id: string;
@@ -58,6 +59,7 @@ interface DepartmentOverview {
   name: string;
   hod: DepartmentHod | null;
   teachers: DepartmentTeacher[];
+  teachingFacultyCount?: number;
   studentCount: number;
   routinesCount: number;
   attendanceRate: string;
@@ -129,6 +131,9 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
   // Student Directory Filter/Search
   const [studentSearchQuery, setStudentSearchQuery] = useState("");
   const [studentDeptFilter, setStudentDeptFilter] = useState("All");
+
+  // Academic Department Roster Filter
+  const [selectedRosterDept, setSelectedRosterDept] = useState<string>("All");
 
   // Selected Student ID Card Preview Modal
   const [previewIdCardUrl, setPreviewIdCardUrl] = useState<string | null>(null);
@@ -237,6 +242,14 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
   const departmentsOverview = analytics?.departmentsOverview || [];
   const allStudents = analytics?.allStudents || [];
   const allPendingLeaves = analytics?.allPendingLeaves || [];
+
+  // Filtered Academic Department Rosters
+  const displayedDepartments = useMemo(() => {
+    if (!selectedRosterDept || selectedRosterDept === "All") {
+      return departmentsOverview;
+    }
+    return departmentsOverview.filter((d) => isSameDepartment(d.name, selectedRosterDept));
+  }, [departmentsOverview, selectedRosterDept]);
 
   // Filtered Students
   const filteredStudents = useMemo(() => {
@@ -504,13 +517,38 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
                 Departmental breakdown displaying designated HOD, teaching faculty, student strength, and active lecture schedules.
               </p>
             </div>
-            <div className="text-xs text-slate-400">
-              Total Units: <strong className="text-white">{departmentsOverview.length}</strong>
+            
+            <div className="flex flex-wrap items-center gap-3 text-xs">
+              {/* Department Dropdown Filter */}
+              <div className="flex items-center gap-2 bg-slate-900/80 px-3 py-2 rounded-xl border border-white/10">
+                <Filter className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <select
+                  value={selectedRosterDept}
+                  onChange={(e) => setSelectedRosterDept(e.target.value)}
+                  className="bg-transparent text-white focus:outline-none cursor-pointer text-xs"
+                >
+                  <option value="All" className="bg-slate-900">All Units ({departmentsOverview.length})</option>
+                  {departmentsOverview.map((d) => (
+                    <option key={d.name} value={d.name} className="bg-slate-900">
+                      {d.name} ({d.teachingFacultyCount ?? d.teachers.length} Faculty)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                onClick={() => fetchPrincipalAnalytics()}
+                className="px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 border border-white/10 flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Sync Department Rosters"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-purple-400" : ""}`} />
+                <span>Sync Rosters</span>
+              </button>
             </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6">
-            {departmentsOverview.map((dept, idx) => (
+            {displayedDepartments.map((dept, idx) => (
               <div
                 key={idx}
                 className="p-6 rounded-3xl glass-card border border-white/10 hover:border-purple-500/40 transition-all space-y-6"
@@ -531,7 +569,7 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
                       </span>
                       <span className="flex items-center gap-1">
                         <Briefcase className="w-3.5 h-3.5 text-emerald-400" />
-                        <strong>{dept.teachers.length}</strong> Faculty Members
+                        <strong>{dept.teachingFacultyCount ?? dept.teachers.length}</strong> Faculty Members
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3.5 h-3.5 text-amber-400" />
@@ -607,7 +645,7 @@ export function PrincipalDashboardClient({ user }: { user: SerializedUser | null
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-300 mb-1">
                       <span className="flex items-center gap-1.5">
                         <Users className="w-3.5 h-3.5 text-sky-400" />
-                        <span>Teaching Faculty ({dept.teachers.length})</span>
+                        <span>Teaching Faculty ({dept.teachingFacultyCount ?? dept.teachers.length})</span>
                       </span>
                       <span className="text-slate-400">Assigned Routine Load</span>
                     </div>

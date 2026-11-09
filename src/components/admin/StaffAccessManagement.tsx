@@ -38,7 +38,7 @@ export function StaffAccessManagement() {
   // Form State
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"Faculty / Teacher" | "Head of Dept (HOD)">("Faculty / Teacher");
-  const [department, setDepartment] = useState("Computer Science & Engineering (CSE)");
+  const [department, setDepartment] = useState<string>(DEPARTMENTS[0] || "Bachelor of Computer Applications (BCA)");
   const [name, setName] = useState("");
 
   // Feedback State

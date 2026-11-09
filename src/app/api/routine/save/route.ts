@@ -3,6 +3,7 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Routine from "@/models/Routine";
 import User from "@/models/User";
 import mongoose from "mongoose";
+import { standardizeDepartment } from "@/lib/departments";
 
 interface RoutineClassInput {
   timeSlot: string;
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const cleanDepartment = department.trim();
+    const cleanDepartment = standardizeDepartment(department.trim());
     const cleanSemester = Number(semester);
     const cleanSection = section.trim();
     const cleanAcademicYear =

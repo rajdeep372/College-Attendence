@@ -4,6 +4,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import User from "@/models/User";
 import Routine from "@/models/Routine";
 import Attendance from "@/models/Attendance";
+import { standardizeDepartment, getDepartmentVariants } from "@/lib/departments";
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,22 +29,23 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const resolvedDepartment = userDept || "Computer Science & Engineering (CSE)";
+    const resolvedDepartment = standardizeDepartment(userDept || "Bachelor of Computer Applications (BCA)");
+    const deptVariants = getDepartmentVariants(resolvedDepartment);
 
     // 1. Total enrolled students in user's department
     const totalStudents = await User.countDocuments({
       role: "Student",
-      department: resolvedDepartment,
+      department: { $in: deptVariants },
     });
 
     // 2. Total registered faculty in user's department
     const totalFaculty = await User.countDocuments({
-      role: { $in: ["Teacher", "HOD"] },
-      department: resolvedDepartment,
+      role: { $in: ["Faculty / Teacher", "Head of Dept (HOD)", "Teacher", "HOD"] },
+      department: { $in: deptVariants },
     });
 
     // 3. Active scheduled classes for this department from MongoDB Routine collection
-    const routines = await Routine.find({ department: resolvedDepartment }).lean();
+    const routines = await Routine.find({ department: { $in: deptVariants } }).lean();
     const activeClasses = routines.reduce(
       (acc, r: any) => acc + (r.classes?.length || 1),
       0

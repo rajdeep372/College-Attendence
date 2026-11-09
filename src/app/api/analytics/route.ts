@@ -8,6 +8,12 @@ import Circular from "@/models/Circular";
 import { currentUser } from "@clerk/nextjs/server";
 import mongoose, { Types } from "mongoose";
 import { getIstCurrentTime, computeClassStatus } from "@/lib/time-utils";
+import { 
+  STANDARD_DEPARTMENTS, 
+  standardizeDepartment, 
+  getDepartmentVariants, 
+  isSameDepartment 
+} from "@/lib/departments";
 
 export async function GET(req: NextRequest) {
   try {
@@ -421,13 +427,18 @@ export async function GET(req: NextRequest) {
     // 3. HOD ANALYTICS
     // -------------------------------------------------------------
     if (role === "HOD") {
-      const deptName = department || "Computer Science & Engineering";
+      const canonicalDept = standardizeDepartment(department || "Bachelor of Computer Applications (BCA)");
+      const deptVariants = getDepartmentVariants(canonicalDept);
+      const deptName = canonicalDept;
 
       const [totalStudents, totalFaculty, departmentRoutines, pendingLeaves, recentAttendance] =
         await Promise.all([
-          User.countDocuments({ role: "Student", department: deptName }),
-          User.countDocuments({ role: "Teacher", department: deptName }),
-          Routine.find({ department: deptName }).lean(),
+          User.countDocuments({ role: "Student", department: { $in: deptVariants } }),
+          User.countDocuments({ 
+            role: { $in: ["Faculty / Teacher", "Head of Dept (HOD)", "Teacher", "HOD"] }, 
+            department: { $in: deptVariants } 
+          }),
+          Routine.find({ department: { $in: deptVariants } }).lean(),
           Leave.find({ department: deptName, status: "Pending" })
             .sort({ createdAt: -1 })
             .limit(10)
@@ -519,13 +530,19 @@ export async function GET(req: NextRequest) {
         pendingLeavesRaw
       ] = await Promise.all([
         User.countDocuments({ role: "Student" }),
-        User.countDocuments({ role: "Teacher" }),
+        User.countDocuments({ 
+          role: { $in: ["Faculty / Teacher", "Head of Dept (HOD)", "Teacher", "HOD"] } 
+        }),
         Routine.find().populate("teacherId", "name email").lean(),
         Attendance.find().sort({ date: -1 }).lean(),
         User.distinct("department"),
         User.find({ role: "Student" }).sort({ name: 1 }).lean(),
-        User.find({ role: "Teacher" }).sort({ name: 1 }).lean(),
-        User.find({ role: "HOD" }).sort({ name: 1 }).lean(),
+        User.find({ 
+          role: { $in: ["Faculty / Teacher", "Head of Dept (HOD)", "Teacher", "HOD"] } 
+        }).sort({ name: 1 }).lean(),
+        User.find({ 
+          role: { $in: ["Head of Dept (HOD)", "HOD"] } 
+        }).sort({ name: 1 }).lean(),
         Leave.find({ status: "Pending" })
           .sort({ createdAt: -1 })
           .populate("applicantId", "name email rollNumber department role profilePicture")
@@ -544,7 +561,7 @@ export async function GET(req: NextRequest) {
         overallPresents += presents;
         overallTotal += total;
 
-        const dept = att.department || "General Academic & Sciences";
+        const dept = standardizeDepartment(att.department || "General Academic & Sciences");
         if (!deptAttendanceMap[dept]) {
           deptAttendanceMap[dept] = { present: 0, total: 0 };
         }
@@ -573,7 +590,7 @@ export async function GET(req: NextRequest) {
           name: st.name,
           email: st.email,
           rollNumber: st.rollNumber || "N/A",
-          department: st.department || "General",
+          department: standardizeDepartment(st.department || "General Academic & Sciences"),
           semester: st.semester || 1,
           section: st.section || "A",
           profilePicture: st.profilePicture || "",
@@ -584,63 +601,66 @@ export async function GET(req: NextRequest) {
         };
       });
 
-      // Map distinct departments
-      const standardDepts = [
-        "Computer Science & Engineering",
-        "Artificial Intelligence & Machine Learning (AIML)",
-        "Information Technology",
-        "Electronics & Communication Engineering",
-        "Electrical & Electronics Engineering",
-        "Mechanical Engineering",
-        "Civil Engineering",
-        "Bachelor of Computer Applications (BCA)",
-        "Master of Computer Applications (MCA)",
-        "Data Science & Analytics",
+      // Map distinct departments strictly standardized
+      const rawDeptNames = [
+        ...departmentsList.map((d: string) => standardizeDepartment(d)),
+        ...Object.keys(deptAttendanceMap).map((d: string) => standardizeDepartment(d)),
+        ...STANDARD_DEPARTMENTS,
       ];
-
-      const activeDeptNames = Array.from(new Set([...departmentsList, ...Object.keys(deptAttendanceMap), ...standardDepts]));
+      const activeDeptNames = Array.from(new Set(rawDeptNames)).filter(Boolean);
 
       // Build structured Department Overview (HOD, Teachers list, Routines count)
-      const departmentsOverview = activeDeptNames.map((deptName) => {
-        const hod = allHodsRaw.find((h) => h.department === deptName) || null;
-        const teachersInDept = allTeachersRaw.filter((t) => t.department === deptName);
-        const deptRoutines = allRoutines.filter((r) => r.department === deptName);
-        const deptStudents = studentMap.filter((s) => s.department === deptName);
-        const stats = deptAttendanceMap[deptName];
-        const pct = stats && stats.total > 0 ? ((stats.present / stats.total) * 100).toFixed(1) + "%" : "0.0%";
+      // Real-time Aggregation: faculty count dynamically reflects User.countDocuments(...)
+      const departmentsOverview = await Promise.all(
+        activeDeptNames.map(async (deptName) => {
+          const variants = getDepartmentVariants(deptName);
+          const hod = allHodsRaw.find((h) => isSameDepartment(h.department, deptName)) || null;
+          const teachersInDept = allTeachersRaw.filter((t) => isSameDepartment(t.department, deptName));
+          const deptRoutines = allRoutines.filter((r) => isSameDepartment(r.department, deptName));
+          const deptStudents = studentMap.filter((s) => isSameDepartment(s.department, deptName));
+          const stats = deptAttendanceMap[deptName];
+          const pct = stats && stats.total > 0 ? ((stats.present / stats.total) * 100).toFixed(1) + "%" : "0.0%";
 
-        return {
-          name: deptName,
-          hod: hod ? {
-            _id: hod._id.toString(),
-            name: hod.name,
-            email: hod.email,
-            phone: hod.phone || "",
-            designation: hod.designation || "Head of Department",
-            profilePicture: hod.profilePicture || "",
-          } : null,
-          teachers: teachersInDept.map((t) => ({
-            _id: t._id.toString(),
-            name: t.name,
-            email: t.email,
-            designation: t.designation || "Faculty",
-            profilePicture: t.profilePicture || "",
-            routinesCount: deptRoutines.reduce(
-              (count, r: any) =>
-                count +
-                (r.classes
-                  ? r.classes.filter((c: any) => c.teacherId?.toString() === t._id.toString()).length
-                  : r.teacherId?._id?.toString() === t._id.toString()
-                  ? 1
-                  : 0),
-              0
-            ),
-          })),
-          studentCount: deptStudents.length,
-          routinesCount: deptRoutines.reduce((acc, r: any) => acc + (r.classes?.length || 1), 0),
-          attendanceRate: pct,
-        };
-      });
+          // Real-time Aggregation: queries users.countDocuments(...) directly from main users collection
+          const dynamicFacultyCount = await User.countDocuments({
+            role: { $in: ["Faculty / Teacher", "Head of Dept (HOD)"] },
+            department: { $in: variants },
+          });
+
+          return {
+            name: deptName,
+            hod: hod ? {
+              _id: hod._id.toString(),
+              name: hod.name,
+              email: hod.email,
+              phone: hod.phone || "",
+              designation: hod.designation || "Head of Department",
+              profilePicture: hod.profilePicture || "",
+            } : null,
+            teachingFacultyCount: Math.max(dynamicFacultyCount, teachersInDept.length),
+            teachers: teachersInDept.map((t) => ({
+              _id: t._id.toString(),
+              name: t.name,
+              email: t.email,
+              designation: t.designation || (t.role === "Head of Dept (HOD)" ? "Head of Department" : "Faculty"),
+              profilePicture: t.profilePicture || "",
+              routinesCount: deptRoutines.reduce(
+                (count, r: any) =>
+                  count +
+                  (r.classes
+                    ? r.classes.filter((c: any) => c.teacherId?.toString() === t._id.toString()).length
+                    : r.teacherId?._id?.toString() === t._id.toString()
+                    ? 1
+                    : 0),
+                0
+              ),
+            })),
+            studentCount: deptStudents.length,
+            routinesCount: deptRoutines.reduce((acc, r: any) => acc + (r.classes?.length || 1), 0),
+            attendanceRate: pct,
+          };
+        })
+      );
 
       const stats = [
         {
