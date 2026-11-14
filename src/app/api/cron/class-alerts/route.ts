@@ -7,15 +7,19 @@ import { getIstCurrentTime, parseTimeSlot } from "@/lib/time-utils";
 import { sendWebPush } from "@/lib/webpush";
 import mongoose from "mongoose";
 
-export async function GET(req: NextRequest) {
-  return handleClassAlerts(req);
+export async function GET(request: Request) {
+  return handleClassAlerts(request);
 }
 
-export async function POST(req: NextRequest) {
-  return handleClassAlerts(req);
+export async function POST(request: Request) {
+  return handleClassAlerts(request);
 }
 
-async function handleClassAlerts(req: NextRequest) {
+export async function HEAD(request: Request) {
+  return new Response(null, { status: 200 });
+}
+
+async function handleClassAlerts(req: Request) {
   try {
     await connectToDatabase();
 
@@ -159,18 +163,27 @@ async function handleClassAlerts(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      istClock: {
-        day: currentDay,
-        time: formattedTime,
-        minutes: currentMinutes,
+    const message =
+      matchedClassesCount === 0
+        ? "Ping successful, no alerts sent"
+        : `Ping successful, processed ${matchedClassesCount} upcoming class alert(s)`;
+
+    return NextResponse.json(
+      {
+        success: true,
+        message,
+        istClock: {
+          day: currentDay,
+          time: formattedTime,
+          minutes: currentMinutes,
+        },
+        matchedClassesCount,
+        pushDispatchedCount,
+        dbNotifCount,
+        alerts: processedAlerts,
       },
-      matchedClassesCount,
-      pushDispatchedCount,
-      dbNotifCount,
-      alerts: processedAlerts,
-    });
+      { status: 200 }
+    );
   } catch (error: unknown) {
     console.error("[Cron: /api/cron/class-alerts] Error:", error);
     const msg = error instanceof Error ? error.message : "Error running class alert cron";
