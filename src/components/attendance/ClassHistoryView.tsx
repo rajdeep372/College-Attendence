@@ -542,3 +542,4 @@ export function ClassHistoryView({
     </div>
   );
 }
+
