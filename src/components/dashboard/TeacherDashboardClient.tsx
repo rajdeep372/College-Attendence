@@ -5,6 +5,7 @@ import { SerializedUser } from "@/lib/actions/user.actions";
 import { RoleGuard } from "@/components/auth/RoleGuard";
 import { UserProfileCard } from "@/components/dashboard/UserProfileCard";
 import { AbsentFirstGridView } from "@/components/attendance/AbsentFirstGridView";
+import { ClassHistoryView } from "@/components/attendance/ClassHistoryView";
 import { ParentAdvisoryModal } from "@/components/modals/ParentAdvisoryModal";
 import { ApplyLeaveModal } from "@/components/modals/ApplyLeaveModal";
 import { 
@@ -24,7 +25,8 @@ import {
   ShieldCheck,
   X,
   FileSpreadsheet,
-  Download
+  Download,
+  History
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -61,6 +63,7 @@ interface TeacherAnalytics {
 export function TeacherDashboardClient({ user }: { user: SerializedUser | null }) {
   const [analytics, setAnalytics] = useState<TeacherAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<"live" | "history">("live");
 
   // Kiosk & Context States
   const [isQrActive, setIsQrActive] = useState(false);
@@ -100,6 +103,17 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
   useEffect(() => {
     fetchTeacherAnalytics();
   }, [user]);
+
+  // Synchronize dashboard analytics when new attendance is submitted
+  useEffect(() => {
+    const handleAttendanceSubmitted = () => {
+      fetchTeacherAnalytics();
+    };
+    window.addEventListener("attendance-submitted", handleAttendanceSubmitted);
+    return () => {
+      window.removeEventListener("attendance-submitted", handleAttendanceSubmitted);
+    };
+  }, []);
 
   const todayClasses = analytics?.todayClasses || [];
   const defaulterList = analytics?.defaulters || [];
@@ -294,8 +308,42 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
           </div>
         </div>
 
-        {/* Dynamic Context-Aware Kiosk Projection Panel */}
-        {isQrActive && (
+        {/* Navigation Tabs: Live Station vs Class History */}
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900/80 border border-white/10 w-fit">
+          <button
+            onClick={() => setActiveTab("live")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === "live"
+                ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Attendance Station & Kiosk</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab("history")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === "history"
+                ? "bg-gradient-to-r from-sky-500 to-blue-600 text-white shadow-[0_0_15px_rgba(14,165,233,0.3)]"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <History className="w-4 h-4" />
+            <span>Class History</span>
+          </button>
+        </div>
+
+        {activeTab === "history" ? (
+          <ClassHistoryView
+            teacherDepartment={user?.department}
+            teacherId={user?._id}
+          />
+        ) : (
+          <>
+            {/* Dynamic Context-Aware Kiosk Projection Panel */}
+            {isQrActive && (
           <div className="p-6 sm:p-8 rounded-3xl glass-card border-2 border-emerald-400/50 bg-slate-900/95 shadow-[0_0_60px_rgba(16,185,129,0.25)] animate-fade-in relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4">
               <button
@@ -399,7 +447,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                         ) : (
                           <>
                             <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                            <span>Download Excel Report</span>
+                            <span>Download Full Semester Matrix</span>
                           </>
                         )}
                       </button>
@@ -555,7 +603,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                         ) : (
                           <>
                             <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
-                            <span>Download Excel Report</span>
+                            <span>Download Full Semester Matrix</span>
                           </>
                         )}
                       </button>
@@ -632,6 +680,8 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             </div>
           </div>
         </div>
+          </>
+        )}
 
         {/* Parent Advisory Modal */}
         <ParentAdvisoryModal

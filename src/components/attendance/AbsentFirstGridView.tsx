@@ -253,6 +253,21 @@ export function AbsentFirstGridView() {
         notificationsSent: data.notificationsSent || 0,
         message: data.message,
       });
+
+      // Dispatch auto-save event so Class History tab immediately syncs new session
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("attendance-submitted", {
+            detail: {
+              subject: subjectName,
+              department,
+              semester,
+              section,
+              date: new Date().toISOString(),
+            },
+          })
+        );
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error submitting attendance";
       setError(msg);
@@ -261,31 +276,46 @@ export function AbsentFirstGridView() {
     }
   };
 
-  // Download Excel (.xlsx) matrix report filtered strictly by the 4 academic hierarchy parameters
-  const handleExportExcel = async () => {
+  const [isExportingMatrix, setIsExportingMatrix] = useState(false);
+
+  // Download Date-Wise Full Semester Master Matrix (.xlsx)
+  const handleExportSemesterMatrix = async () => {
     try {
+      setIsExportingMatrix(true);
       const params = new URLSearchParams({
+        subject: subjectName,
         department,
         academicYear,
         semester: semester.toString(),
         section,
       });
-      const res = await fetch(`/api/export/attendance?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to export Excel report");
+      if (routine?._id) {
+        params.set("routineId", routine._id);
+      }
+
+      const res = await fetch(`/api/attendance/export?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to export semester matrix");
+
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const cleanDept = (department || "Attendance").replace(/[^a-zA-Z0-9_-]/g, "_");
-      a.download = `${cleanDept}_Sem${semester}_Attendance_Report.xlsx`;
+      const cleanSub = (subjectName || department || "Class").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `${cleanSub}_Semester_Attendance_Matrix.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch {
-      window.location.href = `/api/attendance/export?department=${encodeURIComponent(department)}&semester=${semester}&section=${encodeURIComponent(section)}`;
+    } catch (err) {
+      console.error("Export error:", err);
+      window.location.href = `/api/attendance/export?subject=${encodeURIComponent(subjectName)}&department=${encodeURIComponent(department)}&semester=${semester}&section=${encodeURIComponent(section)}`;
+    } finally {
+      setIsExportingMatrix(false);
     }
   };
+
+  // Backward compatibility alias
+  const handleExportExcel = handleExportSemesterMatrix;
 
   // Filter students based on search query
   const filteredStudents = students.filter((s) => {
@@ -325,12 +355,22 @@ export function AbsentFirstGridView() {
         {/* Quick Actions & Excel Export */}
         <div className="flex flex-wrap items-center gap-2.5">
           <button
-            onClick={handleExportExcel}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 shadow-sm transition-all cursor-pointer"
-            title="Download Excel Sheet (.xlsx)"
+            onClick={handleExportSemesterMatrix}
+            disabled={isExportingMatrix}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.35)] transition-all cursor-pointer disabled:opacity-50"
+            title="Download Date-Wise Full Semester Attendance Matrix (.xlsx)"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Export Excel (.xlsx)</span>
+            {isExportingMatrix ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                <span>Exporting Matrix...</span>
+              </>
+            ) : (
+              <>
+                <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                <span>Download Full Semester Matrix</span>
+              </>
+            )}
           </button>
 
           <button
