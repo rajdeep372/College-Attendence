@@ -261,16 +261,30 @@ export function AbsentFirstGridView() {
     }
   };
 
-  // Download Excel (.xlsx) file filtered strictly by the 4 academic hierarchy parameters
-  const handleExportExcel = () => {
-    const params = new URLSearchParams({
-      department,
-      academicYear,
-      semester: semester.toString(),
-      section,
-      format: "xlsx",
-    });
-    window.location.href = `/api/attendance/export?${params.toString()}`;
+  // Download Excel (.xlsx) matrix report filtered strictly by the 4 academic hierarchy parameters
+  const handleExportExcel = async () => {
+    try {
+      const params = new URLSearchParams({
+        department,
+        academicYear,
+        semester: semester.toString(),
+        section,
+      });
+      const res = await fetch(`/api/export/attendance?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to export Excel report");
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cleanDept = (department || "Attendance").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `${cleanDept}_Sem${semester}_Attendance_Report.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      window.location.href = `/api/attendance/export?department=${encodeURIComponent(department)}&semester=${semester}&section=${encodeURIComponent(section)}`;
+    }
   };
 
   // Filter students based on search query

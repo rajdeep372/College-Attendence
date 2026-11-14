@@ -22,7 +22,9 @@ import {
   FileText,
   ChevronDown,
   ShieldCheck,
-  X
+  X,
+  FileSpreadsheet,
+  Download
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -68,6 +70,7 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
   const [turnoutCount, setTurnoutCount] = useState<{ present: number; absent: number }>({ present: 0, absent: 0 });
   const [kioskLoading, setKioskLoading] = useState(false);
   const [kioskError, setKioskError] = useState<string | null>(null);
+  const [isDownloadingExcel, setIsDownloadingExcel] = useState<string | null>(null);
 
   // Modals
   const [isAdvisoryModalOpen, setIsAdvisoryModalOpen] = useState(false);
@@ -206,6 +209,48 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
     return () => clearInterval(interval);
   }, [isQrActive, activeKioskClass]);
 
+  // Blob Download Handling: Calls /api/export/attendance and triggers dynamic filename download
+  const handleDownloadExcelReport = async (cls: TodayClass) => {
+    const classKey = cls.classId || cls.routineId || cls._id || cls.title;
+    try {
+      setIsDownloadingExcel(classKey);
+
+      const params = new URLSearchParams({
+        routineId: cls.routineId || cls._id || "",
+        subjectId: cls.classId || cls._id || "",
+        subject: cls.title,
+        department: cls.department,
+        semester: cls.semester?.toString() || "1",
+        section: cls.section || "Section A",
+      });
+
+      const res = await fetch(`/api/export/attendance?${params.toString()}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.error || `Export failed with status ${res.status}`);
+      }
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      // Dynamic clean filename: e.g. [Subject_Name]_Attendance_Report.xlsx
+      const cleanSubject = (cls.title || "Subject").trim().replace(/[^a-zA-Z0-9_-]+/g, "_");
+      a.download = `${cleanSubject}_Attendance_Report.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      console.error("Error downloading attendance report:", err);
+      const msg = err instanceof Error ? err.message : "Failed to generate attendance report";
+      alert(msg);
+    } finally {
+      setIsDownloadingExcel(null);
+    }
+  };
+
   return (
     <RoleGuard allowedRole="Teacher" user={user}>
       <div className="space-y-8 animate-fade-in relative">
@@ -327,16 +372,37 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                     <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                       Active Session: {activeKioskClass.title} - Sem {activeKioskClass.semester} ({activeKioskClass.section})
                     </h2>
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-300 mt-2 font-mono">
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">
-                        Code: {activeKioskClass.code}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                        Slot: {activeKioskClass.time}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                        {activeKioskClass.department}
-                      </span>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-2">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-slate-300 font-mono">
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-sky-400 border border-slate-700">
+                          Code: {activeKioskClass.code}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          Slot: {activeKioskClass.time}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+                          {activeKioskClass.department}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={() => handleDownloadExcelReport(activeKioskClass)}
+                        disabled={isDownloadingExcel === (activeKioskClass.classId || activeKioskClass.routineId || activeKioskClass._id || activeKioskClass.title)}
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-500/40 shadow-sm shrink-0 self-start sm:self-auto disabled:opacity-50"
+                        title="Download semester date-wise attendance Excel report"
+                      >
+                        {isDownloadingExcel === (activeKioskClass.classId || activeKioskClass.routineId || activeKioskClass._id || activeKioskClass.title) ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                            <span>Exporting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                            <span>Download Excel Report</span>
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -456,8 +522,8 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="flex sm:flex-col items-end justify-between">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3">
+                      <div className="flex sm:flex-col items-end justify-between mr-1">
                         <span
                           className={`text-xs font-bold px-2.5 py-1 rounded-full ${
                             cls.status === "Live Now"
@@ -473,6 +539,26 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
                           {cls.attendance}
                         </span>
                       </div>
+
+                      {/* Prominent Download Excel Report Button with Excel Icon */}
+                      <button
+                        onClick={() => handleDownloadExcelReport(cls)}
+                        disabled={isDownloadingExcel === (cls.classId || cls.routineId || cls._id || cls.title)}
+                        className="px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 bg-emerald-950/70 hover:bg-emerald-900/90 text-emerald-300 border border-emerald-500/40 shadow-sm hover:shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50"
+                        title="Download date-wise student attendance matrix Excel sheet (.xlsx)"
+                      >
+                        {isDownloadingExcel === (cls.classId || cls.routineId || cls._id || cls.title) ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                            <span>Exporting...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileSpreadsheet className="w-4 h-4 text-emerald-400 shrink-0" />
+                            <span>Download Excel Report</span>
+                          </>
+                        )}
+                      </button>
 
                       {/* Launch Kiosk Button for this specific class */}
                       <button
