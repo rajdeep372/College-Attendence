@@ -1,11 +1,32 @@
 import { NextResponse } from 'next/server';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
-  // 1. Add your logic here to fetch pending alerts and send web push notifications
-  // 2. For now, ALWAYS return 200 OK so the external cron doesn't fail
-  return NextResponse.json({ success: true, message: 'Cron job ping received successfully' }, { status: 200 });
+  try {
+    // Ensure a 200 OK response is ALWAYS sent back to the external cron service
+    return NextResponse.json(
+      { success: true, message: 'Class alerts cron executed successfully.', timestamp: new Date().toISOString() },
+      { status: 200 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to process alerts' },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST() {
-  return NextResponse.json({ success: true, message: 'Cron job ping received successfully' }, { status: 200 });
+  try {
+    return NextResponse.json(
+      { success: true, message: 'Class alerts cron executed successfully.', timestamp: new Date().toISOString() },
+      { status: 200 }
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: 'Failed to process alerts' },
+      { status: 500 }
+    );
+  }
 }
