@@ -12,8 +12,6 @@ const isPublicRoute = createRouteMatcher([
   "/sw.js",
   "/icons/(.*)",
   "/api/public(.*)",
-  "/api/cron/class-alerts",
-  "/api/cron(.*)",
   "/api/export(.*)",
   "/api/push(.*)",
   "/api/users(.*)",
@@ -24,11 +22,6 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  // 0. Completely bypass middleware for public cron and webhook routes
-  if (req.nextUrl.pathname.toLowerCase().startsWith("/api/cron")) {
-    return NextResponse.next();
-  }
-
   const hasClerkKey =
     process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
     !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.includes("placeholder");
