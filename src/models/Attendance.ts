@@ -1,5 +1,22 @@
 import mongoose, { Schema, Document, Model, Types } from "mongoose";
 
+export interface IDeviceBinding {
+  studentId: Types.ObjectId;
+  deviceId: string;
+  recordedAt: Date;
+}
+
+export interface IAttendanceAuditLog {
+  studentId: Types.ObjectId;
+  oldStatus: string;
+  newStatus: string;
+  editReason?: string;
+  remarks?: string;
+  editedBy: Types.ObjectId;
+  editedByName?: string;
+  editedAt: Date;
+}
+
 export interface IAttendance extends Document {
   date: Date;
   timeSlot?: string;
@@ -13,6 +30,9 @@ export interface IAttendance extends Document {
   presentStudents: Types.ObjectId[];
   absentStudents: Types.ObjectId[];
   markedBy: Types.ObjectId;
+  usedDeviceIds?: string[];
+  deviceBindings?: IDeviceBinding[];
+  auditLogs?: IAttendanceAuditLog[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -92,6 +112,31 @@ const AttendanceSchema = new Schema<IAttendance>(
       required: [true, "Marking teacher ID is required"],
       index: true,
     },
+    usedDeviceIds: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    deviceBindings: [
+      {
+        studentId: { type: Schema.Types.ObjectId, ref: "User" },
+        deviceId: { type: String, trim: true },
+        recordedAt: { type: Date, default: Date.now },
+      },
+    ],
+    auditLogs: [
+      {
+        studentId: { type: Schema.Types.ObjectId, ref: "User" },
+        oldStatus: { type: String, enum: ["Present", "Absent", "P", "A"] },
+        newStatus: { type: String, enum: ["Present", "Absent", "P", "A"] },
+        editReason: { type: String, trim: true },
+        remarks: { type: String, trim: true },
+        editedBy: { type: Schema.Types.ObjectId, ref: "User" },
+        editedByName: { type: String, trim: true },
+        editedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

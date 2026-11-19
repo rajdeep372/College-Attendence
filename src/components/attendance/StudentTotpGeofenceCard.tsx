@@ -16,6 +16,7 @@ import {
   Crosshair
 } from "lucide-react";
 import { COLLEGE_COORDINATES, calculateHaversineDistance } from "@/lib/totp";
+import { getOrCreateDeviceId } from "@/lib/device";
 
 interface GeolocationCoords {
   latitude: number;
@@ -133,6 +134,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
 
       setStatusMessage("Validating RCCIIT Geofence (≤150m) & PIN with Campus Server...");
 
+      const deviceId = getOrCreateDeviceId();
       const response = await fetch("/api/attendance/mark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -141,6 +143,7 @@ export function StudentTotpGeofenceCard({ studentId }: { studentId?: string }) {
           latitude: userCoords.latitude,
           longitude: userCoords.longitude,
           studentId,
+          deviceId,
         }),
       });
 

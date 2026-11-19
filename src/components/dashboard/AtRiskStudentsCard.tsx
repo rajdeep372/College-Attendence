@@ -10,7 +10,9 @@ import {
   ShieldAlert, 
   UserX,
   TrendingDown,
-  Sparkles
+  Sparkles,
+  Download,
+  AlertCircle
 } from "lucide-react";
 import { AtRiskStudentData } from "@/app/api/notifications/check/route";
 
@@ -19,11 +21,40 @@ export function AtRiskStudentsCard({ department }: { department?: string } = {})
   const [isLoading, setIsLoading] = useState(false);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isExportingXlsx, setIsExportingXlsx] = useState(false);
 
   // Initial fetch of at-risk students
   useEffect(() => {
     fetchAtRiskList();
   }, [department]);
+
+  const handleExportDefaultersXlsx = async () => {
+    try {
+      setIsExportingXlsx(true);
+      const params = new URLSearchParams({
+        department: department || "all",
+        format: "xlsx",
+      });
+      const res = await fetch(`/api/attendance/defaulters?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to export defaulters sheet");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const deptClean = (department || "All_Departments").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `Attendance_Defaulters_Under_75_${deptClean}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Defaulter export error:", err);
+      window.location.href = `/api/attendance/defaulters?department=${encodeURIComponent(department || "")}&format=xlsx`;
+    } finally {
+      setIsExportingXlsx(false);
+    }
+  };
 
   const fetchAtRiskList = async () => {
     try {
@@ -97,24 +128,46 @@ export function AtRiskStudentsCard({ department }: { department?: string } = {})
           </div>
         </div>
 
-        {/* Action Button */}
-        <button
-          onClick={handleTriggerNotifications}
-          disabled={isLoading}
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-500 via-rose-600 to-orange-600 hover:from-rose-400 hover:to-orange-500 shadow-[0_0_20px_rgba(244,63,94,0.35)] transition-all cursor-pointer disabled:opacity-50 shrink-0"
-        >
-          {isLoading ? (
-            <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Analyzing & Dispatching...</span>
-            </>
-          ) : (
-            <>
-              <Send className="w-4 h-4" />
-              <span>Trigger Warning Check</span>
-            </>
-          )}
-        </button>
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          {/* Feature 1: Export Defaulters (.xlsx) */}
+          <button
+            onClick={handleExportDefaultersXlsx}
+            disabled={isExportingXlsx}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-[0_0_20px_rgba(244,63,94,0.35)] transition-all cursor-pointer disabled:opacity-50"
+            title="Download Defaulter List (<75%) (.xlsx)"
+          >
+            {isExportingXlsx ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Exporting...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-4 h-4" />
+                <span>Export Defaulters (.xlsx)</span>
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleTriggerNotifications}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-rose-500 via-rose-600 to-orange-600 hover:from-rose-400 hover:to-orange-500 shadow-[0_0_20px_rgba(244,63,94,0.35)] transition-all cursor-pointer disabled:opacity-50"
+          >
+            {isLoading ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Analyzing & Dispatching...</span>
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                <span>Trigger Warning Check</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Notification Feedback Toast */}
@@ -163,18 +216,31 @@ export function AtRiskStudentsCard({ department }: { department?: string } = {})
               {students.map((student) => (
                 <tr key={student.id} className="hover:bg-slate-800/40 transition-colors">
                   <td className="px-4 py-3">
-                    <div className="font-bold text-white">{student.name}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">{student.email}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-white">{student.name}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono font-bold text-sky-300 border border-white/10">
+                        {student.rollNumber || "N/A"}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">{student.email}</div>
                   </td>
                   <td className="px-4 py-3 text-slate-300">
-                    {student.department}
+                    <div>{student.department}</div>
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
+                      {student.attendedClasses} / {student.totalClasses} Classes Attended
+                    </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-rose-400 font-mono">
-                        {student.attendancePercentage}%
-                      </span>
-                      <div className="w-16 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                          {student.attendancePercentage < 60 ? "Critical (<60%)" : "Defaulter (<75%)"}
+                        </span>
+                        <span className="font-extrabold text-rose-400 font-mono text-xs">
+                          {student.attendancePercentage.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-24 bg-slate-800 rounded-full h-1.5 overflow-hidden">
                         <div
                           className="bg-rose-500 h-1.5 rounded-full"
                           style={{ width: `${Math.min(student.attendancePercentage, 100)}%` }}

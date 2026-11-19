@@ -7,6 +7,7 @@ import Attendance, { IAttendance } from "@/models/Attendance";
 export interface AtRiskStudentData {
   id: string;
   name: string;
+  rollNumber?: string;
   email: string;
   department: string;
   attendancePercentage: number;
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         atRiskStudents.push({
           id: studentIdStr,
           name: student.name,
+          rollNumber: student.rollNumber || "N/A",
           email: student.email,
           department: student.department || "General Academic & Sciences",
           attendancePercentage: percentage,
@@ -246,6 +248,7 @@ export async function GET(req: NextRequest) {
         atRiskStudents.push({
           id: studentIdStr,
           name: student.name,
+          rollNumber: student.rollNumber || "N/A",
           email: student.email,
           department: student.department || "General Academic & Sciences",
           attendancePercentage: percentage,

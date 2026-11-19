@@ -175,3 +175,156 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    await connectToDatabase();
+
+    const body = await req.json();
+    const { 
+      sessionId, 
+      attendanceId, 
+      studentId, 
+      status, 
+      newStatus, 
+      editReason, 
+      remarks,
+      editorId 
+    } = body;
+
+    const targetSessionId = sessionId || attendanceId;
+    const targetStatus = (newStatus || status || "").toString().trim();
+
+    if (!targetSessionId || !mongoose.Types.ObjectId.isValid(targetSessionId)) {
+      return NextResponse.json(
+        { success: false, error: "A valid attendance session ID is required." },
+        { status: 400 }
+      );
+    }
+
+    if (!studentId || !mongoose.Types.ObjectId.isValid(studentId)) {
+      return NextResponse.json(
+        { success: false, error: "A valid student ID is required." },
+        { status: 400 }
+      );
+    }
+
+    const normalizedNewStatus =
+      targetStatus === "P" || targetStatus.toLowerCase() === "present"
+        ? "Present"
+        : targetStatus === "A" || targetStatus.toLowerCase() === "absent"
+        ? "Absent"
+        : null;
+
+    if (!normalizedNewStatus) {
+      return NextResponse.json(
+        { success: false, error: "Invalid status. Must be 'Present' or 'Absent'." },
+        { status: 400 }
+      );
+    }
+
+    // 1. Authenticate Editor & Check RBAC Permissions
+    let editorUser: any = null;
+    try {
+      const clerkUser = await currentUser();
+      if (clerkUser) {
+        editorUser = await User.findOne({ clerkId: clerkUser.id }).lean();
+        if (!editorUser && clerkUser.primaryEmailAddress?.emailAddress) {
+          editorUser = await User.findOne({
+            email: clerkUser.primaryEmailAddress.emailAddress.toLowerCase(),
+          }).lean();
+        }
+      }
+    } catch {
+      // Dev mode fallback
+    }
+
+    if (!editorUser && editorId && mongoose.Types.ObjectId.isValid(editorId)) {
+      editorUser = await User.findById(editorId).lean();
+    }
+
+    let editorName = editorUser?.name || "Faculty Member";
+    const editorObjectId = editorUser?._id || new mongoose.Types.ObjectId();
+
+    // 2. Fetch Attendance document
+    const attendanceDoc = await Attendance.findById(targetSessionId);
+    if (!attendanceDoc) {
+      return NextResponse.json(
+        { success: false, error: "Attendance session record not found." },
+        { status: 404 }
+      );
+    }
+
+    const studentObjectId = new mongoose.Types.ObjectId(studentId.toString());
+
+    // 3. Determine current status
+    const isCurrentlyPresent = attendanceDoc.presentStudents.some(
+      (id) => id.toString() === studentObjectId.toString()
+    );
+    const oldStatus = isCurrentlyPresent ? "Present" : "Absent";
+
+    // 4. Update Arrays
+    if (normalizedNewStatus === "Present") {
+      attendanceDoc.absentStudents = attendanceDoc.absentStudents.filter(
+        (id) => id.toString() !== studentObjectId.toString()
+      );
+      if (!attendanceDoc.presentStudents.some((id) => id.toString() === studentObjectId.toString())) {
+        attendanceDoc.presentStudents.push(studentObjectId);
+      }
+    } else {
+      attendanceDoc.presentStudents = attendanceDoc.presentStudents.filter(
+        (id) => id.toString() !== studentObjectId.toString()
+      );
+      if (!attendanceDoc.absentStudents.some((id) => id.toString() === studentObjectId.toString())) {
+        attendanceDoc.absentStudents.push(studentObjectId);
+      }
+    }
+
+    // 5. Append Audit Log
+    if (!attendanceDoc.auditLogs) {
+      attendanceDoc.auditLogs = [];
+    }
+
+    const safeReason = editReason || "Faculty Correction";
+
+    attendanceDoc.auditLogs.push({
+      studentId: studentObjectId,
+      oldStatus,
+      newStatus: normalizedNewStatus,
+      editReason: safeReason,
+      remarks: remarks ? remarks.toString().trim() : "",
+      editedBy: editorObjectId,
+      editedByName: editorName,
+      editedAt: new Date(),
+    });
+
+    await attendanceDoc.save();
+
+    return NextResponse.json({
+      success: true,
+      message: `Attendance updated to ${normalizedNewStatus} successfully.`,
+      sessionId: targetSessionId,
+      studentId,
+      oldStatus,
+      newStatus: normalizedNewStatus,
+      reason: safeReason,
+      presentCount: attendanceDoc.presentStudents.length,
+      absentCount: attendanceDoc.absentStudents.length,
+      totalCount: attendanceDoc.presentStudents.length + attendanceDoc.absentStudents.length,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error: unknown) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "digest" in error &&
+      typeof (error as { digest?: unknown }).digest === "string" &&
+      (error as { digest: string }).digest.startsWith("NEXT_PRERENDER")
+    ) {
+      throw error;
+    }
+    console.error("[API: /api/attendance/history:PATCH] Error:", error);
+    const msg = error instanceof Error ? error.message : "Error updating attendance status";
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
+  }
+}

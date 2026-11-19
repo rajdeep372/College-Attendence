@@ -15,6 +15,12 @@ export interface IKioskSession extends Document {
   teacherName: string;
   expiresAt: Date;
   isActive: boolean;
+  usedDeviceIds?: string[];
+  deviceBindings?: Array<{
+    studentId: Types.ObjectId;
+    deviceId: string;
+    recordedAt: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -93,6 +99,19 @@ const KioskSessionSchema = new Schema<IKioskSession>(
       type: Boolean,
       default: true,
     },
+    usedDeviceIds: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+    deviceBindings: [
+      {
+        studentId: { type: Schema.Types.ObjectId, ref: "User" },
+        deviceId: { type: String, trim: true },
+        recordedAt: { type: Date, default: Date.now },
+      },
+    ],
   },
   {
     timestamps: true,

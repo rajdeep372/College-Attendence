@@ -182,6 +182,19 @@ export function HodDashboardClient({ user }: { user: SerializedUser | null }) {
                 <Download className="w-4 h-4" />
                 <span>Export Attendance CSV</span>
               </button>
+
+              {/* Feature 1: Export Defaulters (.xlsx) */}
+              <button
+                onClick={() => {
+                  const dept = user?.department || "Computer Science & Engineering";
+                  window.location.href = `/api/attendance/defaulters?department=${encodeURIComponent(dept)}&format=xlsx`;
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.4)] transition-all cursor-pointer"
+                title="Download Department Defaulters List (<75%) (.xlsx)"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export Defaulters (.xlsx)</span>
+              </button>
             </div>
           </div>
         </div>

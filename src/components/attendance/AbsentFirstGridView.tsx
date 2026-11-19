@@ -104,6 +104,41 @@ export function AbsentFirstGridView() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Feature 1: Defaulters (<75%) States
+  const [showDefaultersOnly, setShowDefaultersOnly] = useState(false);
+  const [defaulterMap, setDefaulterMap] = useState<Map<string, { percentage: number; attended: number; total: number }>>(new Map());
+  const [isExportingDefaulters, setIsExportingDefaulters] = useState(false);
+
+  // Fetch Defaulters for this cohort & subject
+  useEffect(() => {
+    async function fetchCohortDefaulters() {
+      try {
+        const params = new URLSearchParams({
+          department,
+          semester: String(semester),
+          section,
+          subject: subjectName,
+        });
+        const res = await fetch(`/api/attendance/defaulters?${params.toString()}`);
+        const data = await res.json();
+        if (data.success && Array.isArray(data.defaulters)) {
+          const map = new Map<string, { percentage: number; attended: number; total: number }>();
+          data.defaulters.forEach((d: any) => {
+            map.set(d._id, {
+              percentage: d.percentage,
+              attended: d.attendedClasses,
+              total: d.totalClasses,
+            });
+          });
+          setDefaulterMap(map);
+        }
+      } catch (err) {
+        console.warn("Could not load cohort defaulters:", err);
+      }
+    }
+    fetchCohortDefaulters();
+  }, [department, semester, section, subjectName]);
+
   // Sync Semester -> Academic Year
   const handleSemesterChange = (newSem: number) => {
     setSemester(newSem);
@@ -317,8 +352,44 @@ export function AbsentFirstGridView() {
   // Backward compatibility alias
   const handleExportExcel = handleExportSemesterMatrix;
 
-  // Filter students based on search query
+  // Feature 1: 1-Click Export Defaulters (.xlsx)
+  const handleExportDefaulters = async () => {
+    try {
+      setIsExportingDefaulters(true);
+      const params = new URLSearchParams({
+        department,
+        semester: String(semester),
+        section,
+        subject: subjectName,
+        format: "xlsx",
+      });
+
+      const res = await fetch(`/api/attendance/defaulters?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to export defaulters sheet");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const cleanSub = (subjectName || department || "Cohort").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `Defaulters_Under_75pct_${cleanSub}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Defaulters export error:", err);
+      window.location.href = `/api/attendance/defaulters?department=${encodeURIComponent(department)}&semester=${semester}&section=${encodeURIComponent(section)}&subject=${encodeURIComponent(subjectName)}&format=xlsx`;
+    } finally {
+      setIsExportingDefaulters(false);
+    }
+  };
+
+  // Filter students based on search query & defaulters toggle
   const filteredStudents = students.filter((s) => {
+    if (showDefaultersOnly && !defaulterMap.has(s._id)) {
+      return false;
+    }
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     return (
@@ -369,6 +440,26 @@ export function AbsentFirstGridView() {
               <>
                 <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
                 <span>Download Full Semester Matrix</span>
+              </>
+            )}
+          </button>
+
+          {/* Feature 1: Export Defaulters (.xlsx) */}
+          <button
+            onClick={handleExportDefaulters}
+            disabled={isExportingDefaulters}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.35)] transition-all cursor-pointer disabled:opacity-50"
+            title="Download Defaulters (<75%) List (.xlsx)"
+          >
+            {isExportingDefaulters ? (
+              <>
+                <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                <span>Exporting Defaulters...</span>
+              </>
+            ) : (
+              <>
+                <AlertCircle className="w-4 h-4 text-rose-200" />
+                <span>Export Defaulters (.xlsx)</span>
               </>
             )}
           </button>
@@ -559,8 +650,8 @@ export function AbsentFirstGridView() {
       )}
 
       {/* Turnout Counters Bar */}
-      <div className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 mb-6 text-xs">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/80 border border-white/5 mb-6 text-xs">
+        <div className="flex flex-wrap items-center gap-4">
           <span className="flex items-center gap-1.5 font-bold text-emerald-400">
             <UserCheck className="w-4 h-4" />
             <span>{presentCount} Present</span>
@@ -569,6 +660,36 @@ export function AbsentFirstGridView() {
             <UserX className="w-4 h-4" />
             <span>{absentCount} Marked Absent</span>
           </span>
+
+          {/* Feature 1: Defaulter Toggle Filter */}
+          <div className="flex items-center gap-2 pl-3 border-l border-white/10">
+            <button
+              type="button"
+              onClick={() => setShowDefaultersOnly(false)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                !showDefaultersOnly
+                  ? "bg-slate-700 text-white shadow"
+                  : "bg-slate-800/80 text-slate-400 hover:text-white"
+              }`}
+            >
+              All ({students.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDefaultersOnly(true)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                showDefaultersOnly
+                  ? "bg-rose-600 text-white shadow-[0_0_12px_rgba(244,63,94,0.4)]"
+                  : "bg-rose-950/60 text-rose-300 border border-rose-500/30 hover:bg-rose-900/60"
+              }`}
+            >
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>Defaulters (&lt;75%)</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-rose-500/30 text-white font-mono">
+                {defaulterMap.size}
+              </span>
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-2 text-slate-400 text-[11px]">
@@ -628,6 +749,19 @@ export function AbsentFirstGridView() {
                     {st.roll || "NO ROLL"}
                   </span>
                 </div>
+
+                {/* Feature 1: Red Defaulter Warning Badge (<75%) */}
+                {defaulterMap.has(st._id) && (
+                  <div className="mb-3 px-2.5 py-1 rounded-lg bg-rose-950/80 border border-rose-500/50 flex items-center justify-between text-[10px] font-mono font-bold text-rose-300">
+                    <span className="flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                      <span>Defaulter &lt;75%</span>
+                    </span>
+                    <span>
+                      {defaulterMap.get(st._id)?.attended}/{defaulterMap.get(st._id)?.total} ({defaulterMap.get(st._id)?.percentage.toFixed(1)}%)
+                    </span>
+                  </div>
+                )}
 
                 {/* Avatar and Name */}
                 <div className="flex items-center gap-3">

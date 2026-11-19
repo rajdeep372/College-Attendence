@@ -63,7 +63,15 @@ interface TeacherAnalytics {
 export function TeacherDashboardClient({ user }: { user: SerializedUser | null }) {
   const [analytics, setAnalytics] = useState<TeacherAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"live" | "history">("live");
+  const [activeTab, setActiveTab] = useState<"live" | "history" | "defaulters">("live");
+
+  // Feature 1: Defaulters View State
+  const [defaultersData, setDefaultersData] = useState<any[]>([]);
+  const [isLoadingDefaulters, setIsLoadingDefaulters] = useState(false);
+  const [isExportingDefaulters, setIsExportingDefaulters] = useState(false);
+  const [defaulterFilterSem, setDefaulterFilterSem] = useState<string>("all");
+  const [defaulterFilterSec, setDefaulterFilterSec] = useState<string>("all");
+  const [defaulterFilterSub, setDefaulterFilterSub] = useState<string>("all");
 
   // Kiosk & Context States
   const [isQrActive, setIsQrActive] = useState(false);
@@ -108,12 +116,74 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
   useEffect(() => {
     const handleAttendanceSubmitted = () => {
       fetchTeacherAnalytics();
+      if (activeTab === "defaulters") {
+        fetchDefaulters();
+      }
     };
     window.addEventListener("attendance-submitted", handleAttendanceSubmitted);
     return () => {
       window.removeEventListener("attendance-submitted", handleAttendanceSubmitted);
     };
-  }, []);
+  }, [activeTab]);
+
+  const fetchDefaulters = useCallback(async () => {
+    try {
+      setIsLoadingDefaulters(true);
+      const params = new URLSearchParams({
+        department: user?.department || "all",
+        semester: defaulterFilterSem,
+        section: defaulterFilterSec,
+        subject: defaulterFilterSub,
+      });
+      const res = await fetch(`/api/attendance/defaulters?${params.toString()}`);
+      const data = await res.json();
+      if (data.success && Array.isArray(data.defaulters)) {
+        setDefaultersData(data.defaulters);
+      }
+    } catch (err) {
+      console.error("Failed to load defaulters:", err);
+    } finally {
+      setIsLoadingDefaulters(false);
+    }
+  }, [user?.department, defaulterFilterSem, defaulterFilterSec, defaulterFilterSub]);
+
+  useEffect(() => {
+    if (activeTab === "defaulters") {
+      fetchDefaulters();
+    }
+  }, [activeTab, fetchDefaulters]);
+
+  const handleExportDefaultersXlsx = async () => {
+    try {
+      setIsExportingDefaulters(true);
+      const params = new URLSearchParams({
+        department: user?.department || "all",
+        semester: defaulterFilterSem,
+        section: defaulterFilterSec,
+        subject: defaulterFilterSub,
+        format: "xlsx",
+      });
+
+      const res = await fetch(`/api/attendance/defaulters?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to export defaulters sheet");
+
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const deptClean = (user?.department || "Department").replace(/[^a-zA-Z0-9_-]/g, "_");
+      a.download = `Attendance_Defaulters_Under_75_${deptClean}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Defaulter export error:", err);
+      window.location.href = `/api/attendance/defaulters?department=${encodeURIComponent(user?.department || "")}&format=xlsx`;
+    } finally {
+      setIsExportingDefaulters(false);
+    }
+  };
 
   const todayClasses = analytics?.todayClasses || [];
   const defaulterList = analytics?.defaulters || [];
@@ -333,6 +403,24 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             <History className="w-4 h-4" />
             <span>Class History</span>
           </button>
+
+          {/* Feature 1: Defaulters (<75%) Tab */}
+          <button
+            onClick={() => setActiveTab("defaulters")}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              activeTab === "defaulters"
+                ? "bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-[0_0_15px_rgba(244,63,94,0.4)]"
+                : "text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+          >
+            <AlertCircle className="w-4 h-4 text-rose-400" />
+            <span>Defaulters (&lt;75%)</span>
+            {defaultersData.length > 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-rose-500/30 text-rose-200 border border-rose-500/40">
+                {defaultersData.length}
+              </span>
+            )}
+          </button>
         </div>
 
         {activeTab === "history" ? (
@@ -340,6 +428,177 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
             teacherDepartment={user?.department}
             teacherId={user?._id}
           />
+        ) : activeTab === "defaulters" ? (
+          <div className="space-y-6 animate-fade-in">
+            {/* Header & Export Card */}
+            <div className="p-6 sm:p-7 rounded-3xl glass-card border border-rose-500/30 bg-slate-900/90 shadow-[0_15px_40px_rgba(244,63,94,0.15)] relative overflow-hidden">
+              <div className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-rose-500/10 blur-3xl pointer-events-none" />
+
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 border-b border-white/10">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-2 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                      <AlertCircle className="w-5 h-5" />
+                    </span>
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                      75% Attendance Defaulter Registry
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      {defaultersData.length} Flagged
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                    Automated registry of all students with &lt;75% cumulative attendance. Generate 1-click clean Excel reports for HOD submission and parent disciplinary advisories.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={handleExportDefaultersXlsx}
+                    disabled={isExportingDefaulters}
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-[0_0_20px_rgba(244,63,94,0.4)] transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    {isExportingDefaulters ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>Exporting Excel...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="w-4 h-4 text-rose-200" />
+                        <span>Export Defaulters (.xlsx)</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => setIsAdvisoryModalOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 transition-all cursor-pointer"
+                  >
+                    <Send className="w-4 h-4" />
+                    <span>Parent Advisory Notice</span>
+                  </button>
+
+                  <button
+                    onClick={fetchDefaulters}
+                    className="p-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-sky-400 transition-all cursor-pointer"
+                    title="Refresh Defaulters List"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isLoadingDefaulters ? "animate-spin" : ""}`} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Filter Controls */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 text-xs">
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Semester</label>
+                  <select
+                    value={defaulterFilterSem}
+                    onChange={(e) => setDefaulterFilterSem(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-rose-400 cursor-pointer"
+                  >
+                    <option value="all">All Semesters</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                      <option key={s} value={s}>Semester {s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Section</label>
+                  <select
+                    value={defaulterFilterSec}
+                    onChange={(e) => setDefaulterFilterSec(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-white focus:outline-none focus:border-rose-400 cursor-pointer"
+                  >
+                    <option value="all">All Sections</option>
+                    {["Section A", "Section B", "Section C", "Section D"].map((sec) => (
+                      <option key={sec} value={sec}>{sec}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-medium mb-1">Subject Keyword (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Distributed Cloud Systems"
+                    value={defaulterFilterSub === "all" ? "" : defaulterFilterSub}
+                    onChange={(e) => setDefaulterFilterSub(e.target.value.trim() ? e.target.value : "all")}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-rose-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Defaulter Students Grid */}
+            {isLoadingDefaulters ? (
+              <div className="p-12 text-center rounded-3xl glass-card border border-white/10 flex flex-col items-center justify-center">
+                <RefreshCw className="w-8 h-8 text-rose-400 animate-spin mb-3" />
+                <p className="text-sm font-semibold text-white">Analyzing Student Attendance Rates...</p>
+                <p className="text-xs text-slate-400 mt-1">Filtering cohort scholars below 75% threshold</p>
+              </div>
+            ) : defaultersData.length === 0 ? (
+              <div className="p-12 text-center rounded-3xl glass-card border border-white/10 flex flex-col items-center justify-center bg-emerald-950/20">
+                <CheckCircle className="w-10 h-10 text-emerald-400 mb-3" />
+                <h4 className="text-base font-bold text-white mb-1">No Defaulters Found (&ge;75% Attendance)</h4>
+                <p className="text-xs text-slate-300 max-w-md">
+                  All registered students in this cohort currently maintain at least 75% attendance.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {defaultersData.map((d) => (
+                  <div
+                    key={d._id}
+                    className="p-5 rounded-2xl glass-card border border-rose-500/30 bg-slate-900/80 hover:border-rose-400 transition-all space-y-3 shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-mono text-xs font-bold text-sky-300 px-2 py-0.5 rounded-md bg-slate-800 border border-white/10">
+                          {d.roll}
+                        </span>
+                        <h4 className="text-base font-bold text-white mt-1.5">{d.name}</h4>
+                        <p className="text-xs text-slate-400 font-mono truncate">{d.email}</p>
+                      </div>
+
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 ${
+                          d.percentage < 60
+                            ? "bg-rose-950 text-rose-300 border-rose-500"
+                            : "bg-amber-950/70 text-amber-300 border-amber-500/50"
+                        }`}
+                      >
+                        {d.status}
+                      </span>
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-slate-950/70 border border-white/5 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400">Turnout Metric:</span>
+                        <span className="font-bold text-rose-400 font-mono text-sm">
+                          {d.percentage.toFixed(1)}%
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-2 rounded-full ${d.percentage < 60 ? "bg-rose-500" : "bg-amber-500"}`}
+                          style={{ width: `${Math.min(d.percentage, 100)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                        <span>Attended: <strong className="text-white">{d.attendedClasses}</strong> / {d.totalClasses}</span>
+                        <span>Sem {d.semester} &bull; {d.section}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {/* Dynamic Context-Aware Kiosk Projection Panel */}
@@ -669,7 +928,26 @@ export function TeacherDashboardClient({ user }: { user: SerializedUser | null }
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-white/10">
+            <div className="mt-6 pt-4 border-t border-white/10 space-y-2">
+              <button
+                onClick={handleExportDefaultersXlsx}
+                disabled={isExportingDefaulters}
+                className="w-full py-2.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                title="Download 75% Defaulters Spreadsheet (.xlsx)"
+              >
+                {isExportingDefaulters ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Exporting Excel...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-rose-200" />
+                    <span>Export Defaulters (.xlsx)</span>
+                  </>
+                )}
+              </button>
+
               <button
                 onClick={() => setIsAdvisoryModalOpen(true)}
                 className="w-full py-2.5 rounded-xl text-xs font-semibold bg-rose-600/30 hover:bg-rose-600/50 border border-rose-500/30 text-rose-300 transition-all cursor-pointer flex items-center justify-center gap-2"

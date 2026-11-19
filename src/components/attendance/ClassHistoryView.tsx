@@ -19,7 +19,11 @@ import {
   Filter,
   CheckCircle2,
   XCircle,
-  X
+  X,
+  Edit3,
+  Save,
+  FileText,
+  AlertTriangle
 } from "lucide-react";
 
 interface StudentMini {
@@ -72,6 +76,17 @@ export function ClassHistoryView({
   // Download states for individual session or matrix
   const [downloadingDayId, setDownloadingDayId] = useState<string | null>(null);
   const [downloadingMatrixKey, setDownloadingMatrixKey] = useState<string | null>(null);
+
+  // Feature 3: Past Attendance Edit Modal State
+  const [editingSession, setEditingSession] = useState<SessionHistoryItem | null>(null);
+  const [editingStudent, setEditingStudent] = useState<StudentMini | null>(null);
+  const [targetNewStatus, setTargetNewStatus] = useState<"Present" | "Absent">("Present");
+  const [editReason, setEditReason] = useState<string>("Medical Leave");
+  const [editRemarks, setEditRemarks] = useState<string>("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [editSuccessMsg, setEditSuccessMsg] = useState<string | null>(null);
+  const [editErrorMsg, setEditErrorMsg] = useState<string | null>(null);
+  const [modalSearchFilter, setModalSearchFilter] = useState("");
 
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
@@ -191,6 +206,92 @@ export function ClassHistoryView({
       alert("Failed to download semester attendance matrix");
     } finally {
       setDownloadingMatrixKey(null);
+    }
+  };
+
+  // Feature 3: Past Attendance Edit Handler
+  const handleSaveAttendanceEdit = async () => {
+    if (!editingSession || !editingStudent) return;
+    setIsSavingEdit(true);
+    setEditSuccessMsg(null);
+    setEditErrorMsg(null);
+
+    try {
+      const res = await fetch("/api/attendance/history", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: editingSession._id,
+          studentId: editingStudent._id,
+          status: targetNewStatus,
+          editReason,
+          remarks: editRemarks,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Failed to update attendance status.");
+      }
+
+      setEditSuccessMsg(
+        `Successfully changed ${editingStudent.name} to ${targetNewStatus} (${editReason}).`
+      );
+
+      // Update in local history state
+      setHistory((prevHistory) =>
+        prevHistory.map((sess) => {
+          if (sess._id !== editingSession._id) return sess;
+
+          let newPresent = [...sess.presentStudents];
+          let newAbsent = [...sess.absentStudents];
+
+          if (targetNewStatus === "Present") {
+            newAbsent = newAbsent.filter((s) => s._id !== editingStudent._id);
+            if (!newPresent.some((s) => s._id === editingStudent._id)) {
+              newPresent.push(editingStudent);
+            }
+          } else {
+            newPresent = newPresent.filter((s) => s._id !== editingStudent._id);
+            if (!newAbsent.some((s) => s._id === editingStudent._id)) {
+              newAbsent.push(editingStudent);
+            }
+          }
+
+          const presentCount = newPresent.length;
+          const absentCount = newAbsent.length;
+          const totalCount = presentCount + absentCount;
+          const turnoutPct =
+            totalCount > 0
+              ? ((presentCount / totalCount) * 100).toFixed(1) + "%"
+              : "0.0%";
+
+          const updatedSess = {
+            ...sess,
+            presentStudents: newPresent,
+            absentStudents: newAbsent,
+            presentCount,
+            absentCount,
+            totalCount,
+            turnoutPercentage: turnoutPct,
+          };
+
+          setEditingSession(updatedSess);
+          return updatedSess;
+        })
+      );
+
+      setTimeout(() => {
+        setEditingStudent(null);
+        setEditRemarks("");
+      }, 1500);
+
+      window.dispatchEvent(new CustomEvent("attendance-submitted"));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error saving edit";
+      setEditErrorMsg(msg);
+    } finally {
+      setIsSavingEdit(false);
     }
   };
 
@@ -461,6 +562,22 @@ export function ClassHistoryView({
                       <span>Semester Matrix</span>
                     </button>
 
+                    {/* Feature 3: Past Attendance Edit Button */}
+                    <button
+                      onClick={() => {
+                        setEditingSession(session);
+                        setEditingStudent(null);
+                        setEditSuccessMsg(null);
+                        setEditErrorMsg(null);
+                        setModalSearchFilter("");
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-950/80 hover:bg-amber-900 text-amber-300 border border-amber-500/40 shadow-sm transition-all cursor-pointer"
+                      title="Edit attendance records with audit logging (Medical / Duty Leave override)"
+                    >
+                      <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Edit Attendance</span>
+                    </button>
+
                     {/* Expand/Collapse Roster Details */}
                     <button
                       onClick={() =>
@@ -539,6 +656,251 @@ export function ClassHistoryView({
           })
         )}
       </div>
+
+      {/* Feature 3: Interactive Past Attendance Edit Modal */}
+      {editingSession && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+          <div className="relative w-full max-w-3xl rounded-3xl bg-slate-900 border border-amber-500/30 p-6 sm:p-8 shadow-[0_20px_60px_rgba(245,158,11,0.2)] my-8 max-h-[90vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Edit3 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-white">
+                    Past Attendance Override Console
+                  </h3>
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    {editingSession.subject} &bull; {editingSession.department} Sem {editingSession.semester} ({editingSession.section}) &bull; {formatDisplayDate(editingSession.date)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setEditingSession(null);
+                  setEditingStudent(null);
+                }}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Notifications */}
+            {editSuccessMsg && (
+              <div className="mt-4 p-3 rounded-xl bg-emerald-950/70 border border-emerald-500/40 text-xs font-semibold text-emerald-300 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{editSuccessMsg}</span>
+              </div>
+            )}
+            {editErrorMsg && (
+              <div className="mt-4 p-3 rounded-xl bg-rose-950/70 border border-rose-500/40 text-xs font-semibold text-rose-300 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+                <span>{editErrorMsg}</span>
+              </div>
+            )}
+
+            {/* Search Filter Inside Modal */}
+            <div className="mt-4 shrink-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search student by name or roll number..."
+                  value={modalSearchFilter}
+                  onChange={(e) => setModalSearchFilter(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+
+            {/* Students List */}
+            <div className="mt-4 overflow-y-auto space-y-3 flex-1 pr-1">
+              {(() => {
+                const combined = [
+                  ...editingSession.presentStudents.map((s) => ({ ...s, currentStatus: "Present" as const })),
+                  ...editingSession.absentStudents.map((s) => ({ ...s, currentStatus: "Absent" as const })),
+                ].sort((a, b) => a.roll.localeCompare(b.roll) || a.name.localeCompare(b.name));
+
+                const filtered = combined.filter((s) => {
+                  if (!modalSearchFilter.trim()) return true;
+                  const q = modalSearchFilter.toLowerCase();
+                  return s.name.toLowerCase().includes(q) || s.roll.toLowerCase().includes(q);
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="p-8 text-center text-xs text-slate-400">
+                      No students found matching &quot;{modalSearchFilter}&quot;.
+                    </div>
+                  );
+                }
+
+                return filtered.map((st) => {
+                  const isCurrentActive = editingStudent?._id === st._id;
+
+                  return (
+                    <div
+                      key={st._id}
+                      className={`p-3.5 rounded-2xl border transition-all ${
+                        isCurrentActive
+                          ? "bg-slate-800/90 border-amber-500/50 shadow-md"
+                          : "bg-slate-950/60 border-white/5 hover:border-white/10"
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-white">{st.name}</span>
+                            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-sky-300 border border-white/10">
+                              {st.roll}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                st.currentStatus === "Present"
+                                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                  : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                              }`}
+                            >
+                              {st.currentStatus}
+                            </span>
+                          </div>
+                        </div>
+
+                        {!isCurrentActive ? (
+                          <button
+                            onClick={() => {
+                              setEditingStudent(st);
+                              setTargetNewStatus(st.currentStatus === "Present" ? "Absent" : "Present");
+                              setEditReason("Medical Leave");
+                              setEditRemarks("");
+                              setEditSuccessMsg(null);
+                              setEditErrorMsg(null);
+                            }}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer self-start sm:self-auto"
+                          >
+                            Override Status
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setEditingStudent(null)}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 transition-all cursor-pointer self-start sm:self-auto"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Active Edit Form for this Student */}
+                      {isCurrentActive && (
+                        <div className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-fade-in text-xs">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Target Status Toggle */}
+                            <div>
+                              <label className="block text-slate-400 font-medium mb-1">Target Status</label>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setTargetNewStatus("Present")}
+                                  className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-center transition-all cursor-pointer ${
+                                    targetNewStatus === "Present"
+                                      ? "bg-emerald-600 text-white shadow-sm"
+                                      : "bg-slate-900 text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  Present (P)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setTargetNewStatus("Absent")}
+                                  className={`flex-1 py-1.5 px-3 rounded-lg font-bold text-center transition-all cursor-pointer ${
+                                    targetNewStatus === "Absent"
+                                      ? "bg-rose-600 text-white shadow-sm"
+                                      : "bg-slate-900 text-slate-400 hover:text-white"
+                                  }`}
+                                >
+                                  Absent (A)
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Reason Dropdown */}
+                            <div>
+                              <label className="block text-slate-400 font-medium mb-1">Reason for Override</label>
+                              <select
+                                value={editReason}
+                                onChange={(e) => setEditReason(e.target.value)}
+                                className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-amber-400 cursor-pointer"
+                              >
+                                <option value="Medical Leave">Medical Leave</option>
+                                <option value="Duty / Hackathon Leave">Duty / Hackathon Leave</option>
+                                <option value="Device Issue">Device Issue</option>
+                                <option value="Faculty Correction">Faculty Correction</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          {/* Remarks */}
+                          <div>
+                            <label className="block text-slate-400 font-medium mb-1">Remarks / Justification (Optional)</label>
+                            <input
+                              type="text"
+                              value={editRemarks}
+                              onChange={(e) => setEditRemarks(e.target.value)}
+                              placeholder="e.g., Medical cert verified / Official Hackathon duty letter submitted"
+                              className="w-full px-3 py-1.5 rounded-lg bg-slate-950 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                            />
+                          </div>
+
+                          {/* Save Button */}
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={handleSaveAttendanceEdit}
+                              disabled={isSavingEdit}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                            >
+                              {isSavingEdit ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Saving Audit Log...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-3.5 h-3.5" />
+                                  <span>Save Override</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Audit Notice Footer */}
+            <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400 shrink-0">
+              <span className="flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                <span>All edits are recorded with institutional audit logs (Teacher ID, timestamp, reason).</span>
+              </span>
+              <button
+                onClick={() => {
+                  setEditingSession(null);
+                  setEditingStudent(null);
+                }}
+                className="px-3 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

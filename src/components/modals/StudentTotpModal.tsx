@@ -16,6 +16,7 @@ import {
   Unlock
 } from "lucide-react";
 import { calculateHaversineDistance, COLLEGE_COORDINATES } from "@/lib/totp";
+import { getOrCreateDeviceId } from "@/lib/device";
 
 interface StudentTotpModalProps {
   isOpen: boolean;
@@ -139,6 +140,7 @@ export function StudentTotpModal({
     try {
       setIsSubmitting(true);
 
+      const deviceId = getOrCreateDeviceId();
       const res = await fetch("/api/attendance/mark", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -148,6 +150,7 @@ export function StudentTotpModal({
           latitude: coords?.latitude ?? RCCIIT_BELIAGHATA.latitude,
           longitude: coords?.longitude ?? RCCIIT_BELIAGHATA.longitude,
           studentId,
+          deviceId,
         }),
       });
 

@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
       pin, 
       latitude, 
       longitude, 
-      studentId 
+      studentId,
+      deviceId,
     } = body;
 
     const submittedPin = (totp || pin || "").toString().trim();
@@ -166,7 +167,26 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 7. Strictly Mark Attendance for THAT Specific Subject and Routine
+    // 7. Anti-Proxy Device Lock (1 Device = 1 Attendance per Session)
+    const cleanDeviceId = (deviceId || "").toString().trim();
+    if (cleanDeviceId) {
+      const kioskBoundToOther = kioskSession.deviceBindings?.some(
+        (b) => b.deviceId === cleanDeviceId && b.studentId && b.studentId.toString() !== student._id.toString()
+      );
+
+      if (kioskBoundToOther) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Proxy Blocked: Attendance has already been marked from this device for this class.",
+            distanceMeters,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // 8. Strictly Mark Attendance for THAT Specific Subject and Routine
     const studentObjectId = new mongoose.Types.ObjectId(student._id.toString());
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
@@ -180,6 +200,39 @@ export async function POST(req: NextRequest) {
       section: kioskSession.section,
       date: { $gte: startOfDay, $lte: endOfDay },
     });
+
+    if (cleanDeviceId && attendanceDoc) {
+      const attendanceBoundToOther = attendanceDoc.deviceBindings?.some(
+        (b) => b.deviceId === cleanDeviceId && b.studentId && b.studentId.toString() !== student._id.toString()
+      );
+
+      if (attendanceBoundToOther) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Proxy Blocked: Attendance has already been marked from this device for this class.",
+            distanceMeters,
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    if (cleanDeviceId) {
+      if (!kioskSession.usedDeviceIds) kioskSession.usedDeviceIds = [];
+      if (!kioskSession.usedDeviceIds.includes(cleanDeviceId)) {
+        kioskSession.usedDeviceIds.push(cleanDeviceId);
+      }
+      if (!kioskSession.deviceBindings) kioskSession.deviceBindings = [];
+      if (!kioskSession.deviceBindings.some((b) => b.deviceId === cleanDeviceId && b.studentId?.toString() === student._id.toString())) {
+        kioskSession.deviceBindings.push({
+          studentId: studentObjectId,
+          deviceId: cleanDeviceId,
+          recordedAt: new Date(),
+        });
+      }
+      await kioskSession.save();
+    }
 
     if (!attendanceDoc) {
       // Find all students in this cohort to initialize absent list
@@ -207,15 +260,43 @@ export async function POST(req: NextRequest) {
         markedBy: kioskSession.teacherId,
         presentStudents: [studentObjectId],
         absentStudents: absentList,
+        usedDeviceIds: cleanDeviceId ? [cleanDeviceId] : [],
+        deviceBindings: cleanDeviceId
+          ? [
+              {
+                studentId: studentObjectId,
+                deviceId: cleanDeviceId,
+                recordedAt: new Date(),
+              },
+            ]
+          : [],
       });
     } else {
       // Move student from absentStudents -> presentStudents
+      const updateQuery: Record<string, unknown> = {
+        $pull: { absentStudents: studentObjectId },
+        $addToSet: { presentStudents: studentObjectId },
+      };
+
+      if (cleanDeviceId) {
+        (updateQuery.$addToSet as Record<string, unknown>).usedDeviceIds = cleanDeviceId;
+        const alreadyBound = attendanceDoc.deviceBindings?.some(
+          (b) => b.deviceId === cleanDeviceId && b.studentId?.toString() === studentObjectId.toString()
+        );
+        if (!alreadyBound) {
+          updateQuery.$push = {
+            deviceBindings: {
+              studentId: studentObjectId,
+              deviceId: cleanDeviceId,
+              recordedAt: new Date(),
+            },
+          };
+        }
+      }
+
       attendanceDoc = await Attendance.findByIdAndUpdate(
         attendanceDoc._id,
-        {
-          $pull: { absentStudents: studentObjectId },
-          $addToSet: { presentStudents: studentObjectId },
-        },
+        updateQuery,
         { new: true }
       );
     }
